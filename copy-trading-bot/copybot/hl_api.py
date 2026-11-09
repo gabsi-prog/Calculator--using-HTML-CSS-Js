@@ -69,3 +69,13 @@ class HyperliquidData:
             "accountValue": float(st["marginSummary"]["accountValue"]),
             "positions": positions,
         }
+
+    def user_fills(self, address: str) -> list[dict]:
+        """Letzte (bis zu 2000) Ausführungen eines Traders, nur Perps."""
+        fills = self._post({"type": "userFills", "user": address}) or []
+        return [f for f in fills if not f["coin"].startswith("@") and "/" not in f["coin"]]
+
+
+def round_px(px: float, sz_decimals: int) -> float:
+    """Hyperliquid-Preisregeln für Perps: max. 5 signifikante Stellen, max. (6 - szDecimals) Nachkommastellen."""
+    return round(float(f"{px:.5g}"), max(0, 6 - sz_decimals))

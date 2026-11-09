@@ -1,0 +1,78 @@
+# Copy-Trading-Bot – läuft automatisch alle 5 Minuten auf GitHub (kein eigener Server nötig)
+# Einstellungen: copy-trading-bot/config.yaml | Schlüssel: Settings -> Secrets and variables -> Actions
+name: Copy-Trading-Bot
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"   # alle 5 Minuten (GitHub startet oft etwas später)
+  workflow_dispatch:         # manuell starten: Tab "Actions" -> "Copy-Trading-Bot" -> "Run workflow"
+    inputs:
+      aktion:
+        description: "Was soll der Bot tun?"
+        type: choice
+        default: durchlauf
+        options:
+          - durchlauf
+          - trader-anzeigen
+          - backtest
+          - bericht
+          - telegram-test
+          - kill-switch-zuruecksetzen
+
+permissions:
+  contents: read
+
+concurrency:
+  group: copybot
+  cancel-in-progress: false
+
+jobs:
+  bot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: copy-trading-bot
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: copy-trading-bot/requirements.txt
+
+      - name: Abhängigkeiten installieren
+        run: pip install -r requirements.txt
+
+      - name: Bot-Gedächtnis laden (Kontostand, Positionen, Trader)
+        uses: actions/cache/restore@v4
+        with:
+          path: copy-trading-bot/state-*.json
+          key: copybot-state-${{ github.run_id }}
+          restore-keys: copybot-state-
+
+      - name: Bot ausführen
+        env:
+          COPYBOT_MODE: ${{ vars.COPYBOT_MODE || 'paper' }}
+          HL_PRIVATE_KEY: ${{ secrets.HL_PRIVATE_KEY }}
+          HL_ACCOUNT_ADDRESS: ${{ secrets.HL_ACCOUNT_ADDRESS }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          AKTION: ${{ inputs.aktion || 'durchlauf' }}
+        run: |
+          case "$AKTION" in
+            durchlauf)                 python -m copybot --once ;;
+            trader-anzeigen)           python -m copybot --leaders ;;
+            backtest)                  python -m copybot --backtest ;;
+            bericht)                   python -m copybot --report ;;
+            telegram-test)             python -m copybot --telegram-test ;;
+            kill-switch-zuruecksetzen) python -m copybot --reset-halt ;;
+          esac
+
+      - name: Bot-Gedächtnis speichern
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: copy-trading-bot/state-*.json
+          key: copybot-state-${{ github.run_id }}

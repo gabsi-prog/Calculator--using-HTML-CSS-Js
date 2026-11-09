@@ -1,5 +1,6 @@
 requests>=2.31
 pyyaml>=6.0
-# nur für LIVE-Trading nötig:
+websocket-client>=1.7
+# für LIVE-Trading:
 hyperliquid-python-sdk>=0.9
 eth-account>=0.10

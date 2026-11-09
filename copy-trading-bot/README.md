@@ -1,5 +1,7 @@
 # Copy-Trading-Bot (Hyperliquid)
 
+> 👉 **Neu hier? Folge der [Schritt-für-Schritt-Anleitung](ANLEITUNG.md).** Du brauchst keine Programmierkenntnisse.
+
 Der Bot sucht die **besten Trader auf Hyperliquid** und **kopiert automatisch ihre Positionen**:
 Kaufen sie, kauft der Bot. Kaufen sie nach, kauft er nach. Verkaufen, schließen oder drehen sie (Long ↔ Short), macht er das auch, angepasst an **deine** Kontogröße.
 
@@ -21,35 +23,35 @@ Kaufen sie, kauft der Bot. Kaufen sie nach, kauft er nach. Verkaufen, schließen
    - **Kill-Switch:** bei −25 % vom Höchststand wird alles geschlossen und der Bot stoppt
    - Coin-Whitelist und -Blacklist (z. B. Memecoins sperren)
    - Kleine Abweichungen (< 10 % oder < 12 USD) werden ignoriert, das spart Gebühren
+   - **Stop-Loss direkt an der Börse** (Standard 8 %). Er greift auch, wenn der Bot aus ist. Danach 12 h Pause für diesen Coin
+4. **Selbstkontrolle**
+   - **Scalper-Filter:** Trader mit mittlerer Haltedauer unter 60 Minuten werden nicht kopiert
+   - **Gewinn je Trader:** Der Bot misst, wie viel *du* mit jedem Trader verdienst. Verlierer fliegen 14 Tage raus
+   - **Backtest:** `--backtest` rechnet nach, was das Kopieren zuletzt gebracht hätte
+5. **Telegram:** Nachricht bei jedem Trade, Stop-Loss und Kill-Switch sowie ein Tagesbericht
+6. **WebSocket:** Im Dauerbetrieb reagiert der Bot sofort, sobald ein Trader handelt
 
-## Installation
+## Befehle (eigener Rechner/Server)
 
 ```bash
 cd copy-trading-bot
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp config.example.yaml config.yaml
+cp .env.example .env              # Telegram/Keys eintragen
+
+python -m copybot --leaders       # wen würde der Bot kopieren?
+python -m copybot --backtest      # was hätte das gebracht?
+python -m copybot --telegram-test # Telegram prüfen
+python -m copybot --once          # ein Durchlauf
+python -m copybot                 # Dauerbetrieb
+python -m copybot --report        # Tagesbericht jetzt
+python -m copybot --reset-halt    # nach Kill-Switch fortsetzen
 ```
 
-## Benutzen
+Ohne eigenen Rechner läuft der Bot über **GitHub Actions** (`.github/workflows/copybot.yml`) alle 5 Minuten.
+Auf einem Linux-Server richtet `bash deploy/install.sh` ihn als Dienst ein. Siehe [ANLEITUNG.md](ANLEITUNG.md).
 
-```bash
-python -m copybot --leaders   # nur anzeigen, wen der Bot kopieren würde
-python -m copybot --once      # einen Durchlauf machen
-python -m copybot             # Dauerbetrieb (Strg+C zum Beenden)
-```
-
-Standard ist **`mode: paper`**: echte Live-Kurse und echte Trader-Positionen, aber **simuliertes Geld** (1000 USD).
-Der Kontostand wird in `state.json` gespeichert, das Log steht in `bot.log`.
-**Lass den Bot erst einige Wochen im Paper-Modus laufen** und prüf, ob er wirklich Gewinn macht.
-
-### Live-Modus (echtes Geld)
-
-1. Auf hyperliquid.xyz unter **More → API** eine **API-Wallet** erstellen. Sie kann handeln, aber **kein Geld abheben**. Deinen Haupt-Private-Key nie verwenden!
-2. `cp .env.example .env` und `HL_PRIVATE_KEY` (der API-Wallet) sowie `HL_ACCOUNT_ADDRESS` (dein Hauptkonto) eintragen.
-3. In `config.yaml` den Wert `mode: live` setzen und mit **kleinem Betrag** starten.
-
-Damit er rund um die Uhr läuft, brauchst du einen kleinen VPS (z. B. Hetzner) und startest ihn dort mit `tmux`, `screen` oder als systemd-Dienst.
+Standard ist **`mode: paper`** mit echten Kursen, echten Trader-Positionen und **simuliertem Geld** (1000 USD).
 
 ## Wichtige Stellschrauben (`config.yaml`)
 
@@ -60,6 +62,9 @@ Damit er rund um die Uhr läuft, brauchst du einen kleinen VPS (z. B. Hetzner) u
 | `copy.capital_usage` | Anteil des Kapitals im Einsatz |
 | `risk.max_leverage` | Obergrenze für den Gesamthebel |
 | `risk.max_drawdown_pct` | Kill-Switch-Schwelle |
+| `risk.stop_loss_pct` | Stop-Loss-Abstand vom Einstiegspreis |
+| `selection.min_median_hold_minutes` | Scalper-Filter |
+| `selection.drop_trader_loss_pct` | Ab welchem Verlust ein Trader rausfliegt |
 | `selection.pinned_traders` | Adressen, die du immer kopieren willst |
 
 ## Tests
