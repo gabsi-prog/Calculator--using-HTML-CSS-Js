@@ -1,0 +1,57 @@
+# ============================================================
+#  Copy-Trading-Bot – Konfiguration
+#  Kopiere diese Datei nach config.yaml und passe sie an.
+# ============================================================
+
+# "paper" = Simulation mit echten Kursen, KEIN echtes Geld (Standard!)
+# "live"  = echte Orders auf Hyperliquid (braucht HL_PRIVATE_KEY + HL_ACCOUNT_ADDRESS)
+mode: paper
+
+# Startkapital für den Paper-Modus (USD)
+paper_start_balance: 1000
+
+# Wie oft der Bot die Positionen der Trader prüft (Sekunden)
+poll_interval_sec: 30
+
+# Wie oft die Liste der "besten Trader" neu berechnet wird (Stunden)
+reselect_interval_hours: 24
+
+# ---------- Auswahl der Trader ----------
+selection:
+  top_n: 5                    # wie vielen Tradern folgen
+  min_account_value: 100000   # nur Konten ab 100k USD (Skin in the game)
+  max_account_value: 50000000 # sehr große Fonds/Market-Maker ausschließen
+  min_month_roi: 0.05         # mind. +5 % im letzten Monat
+  min_alltime_pnl: 100000     # langfristig profitabel
+  require_positive_week: true # auch die letzte Woche im Plus
+  max_month_roi: 5.0          # >500 %/Monat = meist Glück/Zocker -> raus
+  min_month_volume: 1000000   # aktiv handelnde Trader
+  # feste Adressen, die IMMER kopiert werden (optional)
+  pinned_traders: []
+  # Adressen, die NIE kopiert werden
+  excluded_traders: []
+
+# ---------- Kopier-Logik ----------
+copy:
+  # Anteil des eigenen Kapitals, der insgesamt eingesetzt wird (Rest bleibt Puffer)
+  capital_usage: 0.8
+  # Faktor auf die Hebelwirkung der Trader (0.5 = halb so aggressiv wie der Trader)
+  copy_ratio: 0.5
+  # Trades unter diesem Wert (USD) ignorieren (Hyperliquid-Minimum ist 10 USD)
+  min_trade_usd: 12
+  # Nur nachziehen, wenn sich die Zielposition um mind. X % verändert hat
+  rebalance_threshold: 0.10
+  # Max. Slippage für Market-Orders
+  slippage: 0.01
+
+# ---------- Risiko-Management ----------
+risk:
+  max_leverage: 3.0            # Gesamtexposure / Kontowert
+  max_position_pct: 0.35       # max. Anteil des Kontos pro Coin (als Exposure)
+  max_drawdown_pct: 0.25       # Kill-Switch: ab -25 % vom Höchststand alles schließen & stoppen
+  allowed_coins: []            # leer = alle erlaubt, sonst z.B. [BTC, ETH, SOL]
+  blocked_coins: []            # z.B. Memecoins: [kPEPE, kBONK]
+  close_on_leader_exit: true   # Position schließen, wenn der Trader schließt
+
+state_file: state.json
+log_file: bot.log
