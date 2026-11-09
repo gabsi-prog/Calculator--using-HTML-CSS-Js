@@ -9,6 +9,7 @@ import time
 from .broker import LiveBroker, PaperBroker
 from .hl_api import HyperliquidData
 from .healer import Healer
+from .agents.team import active_overlay
 from .learner import daily_learning, leader_weights, risk_throttle
 from .notify import Notifier
 from .selector import holding_stats, is_scalper, rank_traders
@@ -34,6 +35,7 @@ class CopyBot:
                      "weights": {}, "overrides": {}}.items():
             self.state.setdefault(k, v)
         self.healer = Healer(self.state, self.notifier)
+        self.lock = threading.RLock()  # Agenten-Thread & Handels-Schleife teilen sich den Zustand
 
     @property
     def ecfg(self) -> dict:
@@ -140,6 +142,10 @@ class CopyBot:
 
     # ------------------------------------------------------------------ Ein Durchlauf
     def step(self) -> list[dict]:
+        with self.lock:
+            return self._step()
+
+    def _step(self) -> list[dict]:
         if self.halted:
             log.warning("Bot ist gestoppt (Kill-Switch). Zum Fortsetzen: --reset-halt")
             return []
@@ -203,13 +209,20 @@ class CopyBot:
 
         # 6) Ziel berechnen -> Risiko -> Orders
         weights = leader_weights(self.state, self.leaders)
-        targets, contrib = target_exposures(leader_states, equity, copy_cfg, weights)
+        overlay = active_overlay(self.state)
+        trust = overlay["trader"] if overlay else None
+        targets, contrib = target_exposures(leader_states, equity, copy_cfg, weights, trust)
         targets = {c: v for c, v in targets.items() if c in meta}
+        factor = 1.0
         if ecfg.get("learning", {}).get("risk_throttle", True):
             factor = risk_throttle(dd, risk["max_drawdown_pct"])
             if factor < 1:
                 log.info("Risikobremse aktiv: Positionen auf %.0f %% (Drawdown %s)", factor * 100, _pct(dd))
                 targets = {c: v * factor for c, v in targets.items()}
+        if overlay:  # Entscheidung des Risiko-Chefs (nur bremsen, nie verstärken)
+            targets = {c: v * overlay["global"] * overlay["coins"].get(c, 1.0)
+                       for c, v in targets.items() if overlay["sperren"].get(c, 0) < now}
+        self.state["throttle"] = factor if ecfg.get("learning", {}).get("risk_throttle", True) else 1.0
         for coin, cd in self.state["cooldown"].items():
             if coin in targets and (targets[coin] > 0) == (cd["side"] > 0):
                 targets.pop(coin)
@@ -243,10 +256,17 @@ class CopyBot:
         self._save_attribution(after, mids, contrib)
         if notes and self.cfg.get("telegram", {}).get("notify_trades", True):
             self.notifier.send("\n".join(notes) + f"\nKonto: {_usd(self.broker.equity(mids))}")
+        self._record_equity(now, equity)
         self._maybe_daily_report(mids)
         self.healer.cycle_ok()
         self.broker.save()
         return orders
+
+    def _record_equity(self, now, equity):
+        curve = self.state.setdefault("equity_curve", [])
+        if not curve or now - curve[-1][0] >= 600:  # alle 10 min ein Punkt
+            curve.append([int(now), round(equity, 2)])
+            del curve[:-3000]
 
     def _journal_trade(self, o, side, contrib, leader_states, now):
         """Tagebuch + Messung der Verzögerungs-Kosten: Wie viel schlechter steige ich ein als der Trader?"""
@@ -336,6 +356,14 @@ class CopyBot:
                 watcher = LeaderWatcher(lambda: [t["address"] for t in self.leaders], lambda u: wake.set())
             except ImportError:
                 log.warning("websocket-client fehlt – nur Polling")
+        dcfg = self.cfg.get("dashboard", {})
+        if dcfg.get("enabled", True):
+            from .dashboard import start_server
+            try:
+                start_server(self, dcfg.get("port", 8080))
+            except OSError as e:
+                log.warning("Dashboard konnte nicht starten: %s", e)
+        self._start_agent_thread()
         subscribed = None
         while not self.halted:
             try:
@@ -359,6 +387,36 @@ class CopyBot:
                 log.info("Trader-Aktivität erkannt – prüfe sofort")
         if watcher:
             watcher.stop()
+
+
+    def run_agents(self, client=None) -> str:
+        from .agents.team import run_team
+        text = run_team(self, client=client, lock=self.lock)
+        log.info(text)
+        self.notifier.send(text)
+        with self.lock:
+            self.broker.save()
+        return text
+
+    def _start_agent_thread(self):
+        acfg = self.cfg.get("agents", {})
+        if not acfg.get("enabled", True):
+            return
+
+        def loop():
+            while not self.halted:
+                last = (self.state.get("agents") or {}).get("t", 0)
+                wait = last + acfg.get("interval_hours", 8) * 3600 - time.time()
+                if wait <= 0:
+                    try:
+                        self.run_agents()
+                    except Exception:
+                        log.exception("Agenten-Team fehlgeschlagen")
+                        self.state.setdefault("agents", {})["t"] = time.time()  # nicht sofort erneut
+                    continue
+                time.sleep(min(wait, 600))
+
+        threading.Thread(target=loop, daemon=True, name="agents").start()
 
 
 def _usd(v):

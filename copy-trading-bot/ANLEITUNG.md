@@ -71,6 +71,36 @@ Die Kosten liegen bei wenigen Cent pro Woche.
 
 Ohne diesen Key lernt der Bot trotzdem täglich selbst. Nur die KI-Analyse fällt dann weg.
 
+### Schritt 6: Dein Dashboard (Website) einschalten
+
+Der Bot veröffentlicht alle ~15 Minuten eine Website mit Kontostand, Kurve, KI-Team, Positionen und Aktivität.
+
+1. Ein Passwort ausdenken. Das Dashboard liegt öffentlich im Netz, die Daten sind aber damit verschlüsselt.
+2. Bei GitHub ein neues Secret anlegen: Name `DASHBOARD_PASSWORD`, Wert dein Passwort.
+3. **Settings → Pages**: Bei *Source* muss **„GitHub Actions“** stehen. Das ist schon so, weil dein Taschenrechner darüber läuft.
+4. In **Actions** die Aktion **`dashboard-aktualisieren`** ausführen.
+5. Öffnen: **`https://gabsi-prog.github.io/Calculator--using-HTML-CSS-Js/bot/`**, Passwort eingeben, fertig.
+   Tipp fürs Handy: im Browser „Zum Startbildschirm hinzufügen“, dann sieht es aus wie eine App.
+
+Dein Taschenrechner bleibt unter der normalen Adresse erreichbar.
+
+### Schritt 7: KI-Agenten-Team
+
+Mit dem `ANTHROPIC_API_KEY` aus Schritt 5 arbeitet automatisch alle 8 Stunden ein Team aus vier KI-Agenten:
+
+| Agent | Aufgabe |
+|---|---|
+| **Markt-Analyst** | Trend, Volatilität, Funding und Open Interest der gehandelten Coins |
+| **Nachrichten-Analyst** | Sucht im Internet nach aktuellen Meldungen: Hacks, Regulierung, Termine, Stimmung |
+| **Trader-Analyst** | Prüft die kopierten Trader auf Warnsignale wie Verluste nachkaufen oder zu viel Hebel |
+| **Risiko-Chef** | Liest alle Berichte und entscheidet: normale Größe, kleiner oder Coin sperren |
+
+Der Risiko-Chef kann den Bot **nur bremsen, nie aggressiver machen**. Seine Entscheidung gilt höchstens 24 Stunden.
+Die Berichte siehst du im Dashboard und per Telegram. Sofort starten: Aktion **`agenten`**.
+
+**Kosten:** ca. 0,20–0,40 $ pro Runde, also ca. 20–35 $ im Monat. In `config.yaml` begrenzt `agents.monthly_budget_usd` (Standard 30 $) die Kosten hart.
+Günstiger wird es, wenn du `agents.interval_hours` z. B. auf `12` oder `24` setzt.
+
 ### Gut zu wissen
 
 - **Öffentliches Repository:** Die Logs (Trades und Kontostand) kann jeder sehen. Deine Schlüssel nicht. Im Test-Modus ist das egal.
@@ -145,6 +175,12 @@ Ab dem nächsten Lauf handelt der Bot mit echtem Geld. **Gib niemals den Private
    ```
 5. **Wichtig:** Den GitHub-Bot abschalten, damit nicht zwei Bots dasselbe Konto steuern:
    GitHub → **Actions** → **Copy-Trading-Bot** → **„…“** oben rechts → **Disable workflow**.
+
+**Dashboard auf dem Server ansehen** (sicherster Weg, ohne einen Port zu öffnen):
+```
+ssh -i Pfad\zum\key.key -L 8080:localhost:8080 ubuntu@DEINE_IP
+```
+Solange dieses Fenster offen ist, im Browser **http://localhost:8080** öffnen. Auf dem Server reagiert alles in Echtzeit.
 
 Nützliche Befehle auf dem Server:
 | Befehl | Was er macht |

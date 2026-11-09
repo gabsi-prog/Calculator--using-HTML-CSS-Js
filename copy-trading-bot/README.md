@@ -31,6 +31,29 @@ Kaufen sie, kauft der Bot. Kaufen sie nach, kauft er nach. Verkaufen, schließen
 5. **Telegram:** Nachricht bei jedem Trade, Stop-Loss und Kill-Switch sowie ein Tagesbericht
 6. **WebSocket:** Im Dauerbetrieb reagiert der Bot sofort, sobald ein Trader handelt
 
+## 🧑‍💼 KI-Agenten-Team
+
+Alle 8 Stunden (einstellbar) arbeitet ein Team aus Claude-Agenten:
+
+| Agent | Daten | Ergebnis |
+|---|---|---|
+| **Markt-Analyst** | Kerzen, Funding, Open Interest von Hyperliquid. Die Kennzahlen (RSI, SMA, Volatilität) rechnet Python, die KI interpretiert sie. | Marktlage und Warnsignale je Coin |
+| **Nachrichten-Analyst** | Websuche (Claude `web_search`) | Stimmung, wichtige Meldungen, Termine, akute Risiken |
+| **Trader-Analyst** | Positionen und Verhalten der kopierten Trader | Warnsignale wie Martingale, Hebel oder Klumpenrisiko |
+| **Risiko-Chef** | Alle Berichte + Konto | Verbindliche JSON-Entscheidung: Gesamtgröße, Faktor je Coin, Sperren, Vertrauen je Trader |
+
+Die drei Analysten laufen parallel. Der Risiko-Chef kann **nur bremsen**: Alle Faktoren liegen zwischen 0 und 1, Sperren dauern höchstens 72 h, und die Entscheidung verfällt nach 24 h.
+Fällt ein Agent aus, entscheidet der Chef mit den übrigen Berichten. Fällt das ganze Team aus, handelt der Bot normal weiter.
+Ein Monatsbudget (`agents.monthly_budget_usd`) begrenzt die Kosten hart. Code: `copybot/agents/`.
+
+## 🖥 Dashboard „Copy-Desk“
+
+Eine Weboberfläche (HTML/CSS/JS, ohne Build-Schritt) in `dashboard/`. Sie zeigt Kontowert mit Verlaufskurve, Drawdown bis zum Kill-Switch, KI-Team mit Markt-Ampel, Positionen, Trader mit gelernten Gewichten, Lernstand und eine filterbare Aktivitäts-Chronik.
+- **Server/PC:** startet automatisch mit dem Bot unter `http://localhost:8080`
+- **GitHub:** wird alle ~15 min auf GitHub Pages unter `/bot/` veröffentlicht
+- **Verschlüsselt:** Mit `DASHBOARD_PASSWORD` wird `data.json` mit AES-256-GCM verschlüsselt und erst im Browser entschlüsselt
+- Ohne Daten zeigt es markierte Demo-Daten
+
 ## 🧠 Selbstverbesserung
 
 Der Bot lernt auf drei Ebenen aus seinen eigenen Ergebnissen:
@@ -65,6 +88,8 @@ python -m copybot --reset-halt    # nach Kill-Switch fortsetzen
 python -m copybot --ki-analyse    # KI-Analyse jetzt
 python -m copybot --lernstand     # was hat der Bot gelernt?
 python -m copybot --reset-lernen  # Gelerntes vergessen
+python -m copybot --agenten       # KI-Team jetzt analysieren lassen
+python -m copybot --dashboard     # nur das Dashboard starten
 ```
 
 Ohne eigenen Rechner läuft der Bot über **GitHub Actions** (`.github/workflows/copybot.yml`) alle 5 Minuten.

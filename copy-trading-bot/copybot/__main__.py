@@ -9,6 +9,9 @@
   python -m copybot --ki-analyse    wöchentliche KI-Analyse jetzt ausführen
   python -m copybot --lernstand     zeigt, was der Bot bisher gelernt hat
   python -m copybot --reset-lernen  alles Gelernte vergessen (zurück zu config.yaml)
+  python -m copybot --agenten       KI-Agenten-Team jetzt analysieren lassen
+  python -m copybot --dashboard     nur das Web-Dashboard starten (ohne zu handeln)
+  python -m copybot --export-dashboard ORDNER   Dashboard + Daten als statische Website exportieren
 """
 import argparse
 import logging
@@ -55,6 +58,9 @@ def main():
     g.add_argument("--ki-analyse", action="store_true")
     g.add_argument("--lernstand", action="store_true")
     g.add_argument("--reset-lernen", action="store_true")
+    g.add_argument("--agenten", action="store_true")
+    g.add_argument("--dashboard", action="store_true")
+    g.add_argument("--export-dashboard", metavar="ORDNER")
     args = ap.parse_args()
 
     load_env()
@@ -96,6 +102,18 @@ def main():
         print(text)
         bot.notifier.send(text)
         bot.broker.save()
+    elif args.agenten:
+        bot.run_agents()
+    elif args.dashboard:
+        import time as _t
+        from .dashboard import start_server
+        start_server(bot, cfg.get("dashboard", {}).get("port", 8080))
+        while True:
+            _t.sleep(3600)
+    elif args.export_dashboard:
+        from .dashboard import export_site
+        export_site(bot, args.export_dashboard)
+        print(f"Dashboard exportiert nach {args.export_dashboard}")
     elif args.lernstand:
         print(lernstand(bot))
     elif args.reset_lernen:
