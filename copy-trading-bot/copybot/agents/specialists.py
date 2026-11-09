@@ -47,7 +47,12 @@ Ignoriere Werbung, Kursprognosen und Influencer-Hype. Maximal ~300 Wörter."""
 
     def build_input(self, ctx):
         coins = ", ".join(ctx["coins"]) or "BTC, ETH"
-        return f"Heute ist {ctx['datum']}. Relevante Coins: {coins}. Bitte recherchiere und berichte."
+        text = f"Heute ist {ctx['datum']}. Relevante Coins (Hyperliquid): {coins}."
+        if ctx.get("meme") and ctx["meme"]["positionen"]:
+            memes = ", ".join(f"{p['token']} ({p['mint']})" for p in ctx["meme"]["positionen"])
+            text += (f" Zusätzlich hält der Bot diese Solana-Memecoins: {memes}. Suche gezielt nach Rug-Pull-, "
+                     "Scam- oder Dev-Verkauf-Meldungen zu ihnen und nach der allgemeinen Memecoin-Stimmung auf Solana.")
+        return text + " Bitte recherchiere und berichte."
 
 
 class TraderAnalyst(Agent):
@@ -64,7 +69,8 @@ Liefere je Trader 1–2 Zeilen (Kurzadresse + Einschätzung) und am Ende **Empfe
 Maximal ~250 Wörter."""
 
     def build_input(self, ctx):
-        return "Trader-Daten (JSON):\n" + compact(ctx["traders"])
+        return "Trader-Daten (JSON):\n" + compact({"hyperliquid_trader": ctx["traders"],
+                                                  "memecoin_wallets": (ctx.get("meme") or {}).get("wallets")})
 
 
 class RiskChief(Agent):
@@ -80,6 +86,8 @@ klaren, belegten Risiken (z. B. Marktcrash, große Makro-Termine, Hyperliquid-Pr
 - coin_faktoren: je Coin 0.0–1.0 (nur Coins mit besonderem Risiko nennen; 0 = Position schließen).
 - sperren: Coins, die für X Stunden (1–72) gar nicht gehandelt werden sollen (nur bei akuter Gefahr wie Hack/Delisting).
 - trader_vertrauen: je Trader-Adresse 0.0–1.0 (nur bei klaren Warnsignalen <1).
+- memecoin_faktor (0.0–1.0): Einsatz für NEUE Memecoin-Käufe (Solana). 0 = keine neuen Käufe (z. B. bei \
+Panik im Memecoin-Markt oder Problemen bei Solana). Ohne besondere Lage 1.0.
 Sei zurückhaltend: Unnötiges Bremsen kostet Rendite. Ohne klare Belege -> 1.0.
 Schreibe eine kurze zusammenfassung (2–4 Sätze, Deutsch, für Einsteiger) und optional warnungen für den Besitzer."""
     schema = {
@@ -101,16 +109,18 @@ Schreibe eine kurze zusammenfassung (2–4 Sätze, Deutsch, für Einsteiger) und
                                                  "grund": {"type": "string"}},
                 "required": ["adresse", "faktor", "grund"], "additionalProperties": False}},
             "warnungen": {"type": "array", "items": {"type": "string"}},
+            "memecoin_faktor": {"type": "number"},
         },
         "required": ["zusammenfassung", "marktampel", "global_faktor", "coin_faktoren", "sperren",
-                     "trader_vertrauen", "warnungen"],
+                     "trader_vertrauen", "warnungen", "memecoin_faktor"],
         "additionalProperties": False,
     }
 
     def build_input(self, ctx):
         reports = "\n\n".join(f"### {r['name']}\n{r['text']}" for r in ctx["reports"] if r.get("ok"))
         return (f"Berichte deines Teams:\n\n{reports}\n\nKonto & Positionen (JSON):\n"
-                + compact({"konto": ctx["account"], "positionen": ctx["positions"], "trader": ctx["trader_ids"]}))
+                + compact({"konto": ctx["account"], "positionen": ctx["positions"], "trader": ctx["trader_ids"],
+                           "memecoins": ctx.get("meme")}))
 
 
 SPECIALISTS = [MarketAnalyst, NewsAnalyst, TraderAnalyst]

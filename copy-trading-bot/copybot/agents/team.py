@@ -55,10 +55,19 @@ def gather_context(bot) -> dict:
             market[c] = summarize(data.candles(c), ctxs.get(c))
         except Exception as e:
             market[c] = {"fehler": str(e)[:100]}
+    meme = None
+    if getattr(bot, "meme", None):
+        ms = bot.meme.summary()
+        meme = {"positionen": [{"token": p["symbol"], "mint": p["mint"], "einsatz_sol": round(p["cost_sol"], 4),
+                                "ergebnis_pct": round(p["pnl_pct"] * 100, 1), "wallet": p["leader"]}
+                               for p in ms["positionen"]],
+                "wallets": [{k: w[k] for k in ("adresse", "pnl_sol", "trades", "wins", "copied", "skipped", "gesperrt")}
+                            for w in ms["wallets"]],
+                "heute_pnl_sol": round(ms["tag"].get("pnl_sol", 0), 4)}
     equity = bot.broker.equity(mids)
     peak = st.get("peak_equity") or equity
     return {"datum": dt.date.today().isoformat(), "coins": coins, "market": market, "positions": positions,
-            "traders": traders, "trader_ids": [t["adresse"] for t in traders],
+            "traders": traders, "trader_ids": [t["adresse"] for t in traders], "meme": meme,
             "account": {"kontowert": round(equity, 2), "hoechststand": round(peak, 2),
                         "drawdown_pct": round((1 - equity / peak) * 100, 2) if peak else 0, "modus": bot.cfg["mode"]}}
 
@@ -79,6 +88,7 @@ def apply_decision(state: dict, decision: dict) -> dict:
         "coins": {c["coin"]: clamp01(c["faktor"]) for c in decision.get("coin_faktoren", [])},
         "trader": {t["adresse"].lower(): clamp01(t["faktor"]) for t in decision.get("trader_vertrauen", [])},
         "sperren": {s["coin"]: now + max(1, min(72, float(s["stunden"]))) * 3600 for s in decision.get("sperren", [])},
+        "meme": clamp01(decision.get("memecoin_faktor", 1.0)),
     }
     state["agent_overlay"] = overlay
     return overlay
@@ -143,6 +153,9 @@ def _store_results(bot, reports, chief, all_reports, model, started) -> str:
         ampel = {"gruen": "🟢", "gelb": "🟡", "rot": "🔴"}.get(ov["ampel"], "⚪")
         lines += [f"{ampel} Markt-Ampel: {ov['ampel'].upper()}", "", d["zusammenfassung"], "",
                   f"Positionsgröße gesamt: {ov['global'] * 100:.0f} %"]
+        if ov["meme"] < 1:
+            meme_txt = "PAUSIERT" if ov["meme"] <= 0 else f"{ov['meme'] * 100:.0f} % Einsatz"
+            lines.append(f"Memecoin-Käufe: {meme_txt}")
         lines += [f"• {c['coin']}: {clamp01(c['faktor']) * 100:.0f} % – {c['grund']}" for c in d["coin_faktoren"]]
         lines += [f"⛔ {s['coin']} gesperrt für {s['stunden']:.0f} h – {s['grund']}" for s in d["sperren"]]
         lines += [f"🕵️ Trader {t['adresse'][:10]}… Vertrauen {clamp01(t['faktor']) * 100:.0f} % – {t['grund']}"

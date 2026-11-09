@@ -54,6 +54,7 @@ def build_data(bot) -> dict:
                    "aenderungen": j.get("changes", [])[-30:]},
         "aktivitaet": {"trades": j.get("trades", [])[-60:], "stops": j.get("stops", [])[-20:],
                        "fehler": j.get("errors", [])[-30:]},
+        "meme": bot.meme.summary() if getattr(bot, "meme", None) else {"aktiv": False},
         "sperren": {"cooldown": st.get("cooldown", {}), "quarantaene": st.get("quarantine", {}),
                     "aussortiert": st.get("benched", {})},
     }

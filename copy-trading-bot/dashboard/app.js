@@ -124,6 +124,7 @@
     <main class="wrap">
       ${accountSection(d, pnl, agentFactor)}
       ${agentSection(d)}
+      ${memeSection(d)}
       <section class="two">
         ${positionsPanel(d)}
         ${tradersPanel(d)}
@@ -292,6 +293,56 @@
     </div>`;
   }
 
+  // ---------- Memecoins ----------
+  const sol = (v, dg = 3) => (v == null || isNaN(v) ? "–" : v.toLocaleString("de-DE", { minimumFractionDigits: dg, maximumFractionDigits: dg }) + " SOL");
+  const signedSol = (v, dg = 4) => (v > 0 ? "+" : "") + sol(v, dg);
+
+  function memeSection(d) {
+    const m = d.meme;
+    if (!m) return "";
+    if (!m.aktiv) {
+      return `<section><div class="section-head"><h2>Memecoins · Solana</h2></div>
+        <div class="panel empty">Der Memecoin-Bot ist aus. Trag in <code>config.yaml</code> unter <code>meme.wallets</code> Trader-Wallets aus FOMO oder Axiom ein,
+        setz <code>meme.enabled: true</code> und starte den Bot auf einem Server oder PC. Für Memecoins ist GitHub Actions zu langsam.</div></section>`;
+    }
+    const startSol = m.start_sol || m.wert_sol;
+    const since = startSol ? m.wert_sol / startSol - 1 : 0;
+    const pos = m.positionen.map((p) => `
+      <tr><td><a class="coin" href="https://dexscreener.com/solana/${encodeURIComponent(p.mint)}" target="_blank" rel="noopener">${esc(p.symbol)}</a></td>
+        <td class="r num">${sol(p.cost_sol)}</td><td class="r num">${sol(p.value_sol)}</td>
+        <td class="r num ${cls(p.pnl_pct)}">${signedPct(p.pnl_pct, 0)}</td>
+        <td>${p.tp_done ? `<span class="side long">EINSATZ GESICHERT</span>` : `<span class="muted">läuft</span>`}</td>
+        <td class="mono muted">${short(p.leader)}</td><td class="muted">${ago(p.opened)}</td></tr>`).join("");
+    const wallets = m.wallets.map((w) => `
+      <tr><td class="mono" title="${esc(w.adresse)}">${short(w.adresse)}</td>
+        <td class="r num">${w.copied}</td><td class="r num muted">${w.skipped}</td>
+        <td class="r num">${w.trades ? Math.round(w.wins / w.trades * 100) + " %" : "–"}</td>
+        <td class="r num ${cls(w.pnl_sol)}">${signedSol(w.pnl_sol)}</td>
+        <td>${w.gesperrt ? `<span class="side short">PAUSE</span>` : `<span class="side long">AKTIV</span>`}</td></tr>`).join("");
+    return `
+    <section aria-label="Memecoins">
+      <div class="section-head"><h2>Memecoins · Solana</h2><p>Kopiert Wallets aus FOMO und Axiom · Stop-Loss, Take-Profit und Trailing-Stop automatisch</p></div>
+      <div class="kpis panel">
+        <div><div class="eyebrow">Wert</div><div class="kpi">${sol(m.wert_sol)}</div><small class="muted">${m.sol_usd ? usd(m.wert_sol * m.sol_usd) : ""}</small></div>
+        <div><div class="eyebrow">Seit Start</div><div class="kpi ${cls(since)}">${signedPct(since)}</div><small class="muted">Start ${sol(startSol, 2)}</small></div>
+        <div><div class="eyebrow">Heute</div><div class="kpi ${cls(m.tag.pnl_sol)}">${signedSol(m.tag.pnl_sol || 0, 3)}</div><small class="muted">${m.tag.buys || 0} Käufe</small></div>
+        <div><div class="eyebrow">Frei verfügbar</div><div class="kpi">${sol(m.sol)}</div><small class="muted">${m.positionen.length} offene Positionen</small></div>
+      </div>
+      <div class="meme-grid">
+        <div class="panel">
+          <div class="section-head pad" style="margin:0;padding-bottom:6px"><h2>Offene Memecoins</h2><p>Klick öffnet den Chart</p></div>
+          ${pos ? `<div class="table-scroll"><table><thead><tr><th>Token</th><th class="r">Einsatz</th><th class="r">Wert</th><th class="r">Ergebnis</th><th>Status</th><th>Wallet</th><th>Seit</th></tr></thead><tbody>${pos}</tbody></table></div>`
+                : `<div class="empty">Gerade keine Memecoins im Bestand.</div>`}
+        </div>
+        <div class="panel">
+          <div class="section-head pad" style="margin:0;padding-bottom:6px"><h2>Kopierte Wallets</h2><p>Verlierer pausieren automatisch</p></div>
+          ${wallets ? `<div class="table-scroll"><table><thead><tr><th>Wallet</th><th class="r">Kopiert</th><th class="r">Übersprungen</th><th class="r">Treffer</th><th class="r">Für dich</th><th>Status</th></tr></thead><tbody>${wallets}</tbody></table></div>`
+                    : `<div class="empty">Noch keine Wallets eingetragen.</div>`}
+        </div>
+      </div>
+    </section>`;
+  }
+
   const PARAM_NAMES = {
     "risk.stop_loss_pct": ["Stop-Loss-Abstand", "pct"], "copy.copy_ratio": ["Kopier-Faktor", "x"],
     "risk.max_leverage": ["Max. Hebel gesamt", "x"], "risk.max_position_pct": ["Max. pro Coin", "pct"],
@@ -321,12 +372,20 @@
     for (const s of a.stops) items.push({ t: s.t, kind: "stop", html: `<b>${esc(s.coin)}</b> per Stop-Loss geschlossen${s.whipsaw === true ? " <span>· später unnötig gewesen</span>" : s.whipsaw === false ? " <span>· war berechtigt</span>" : ""}` });
     for (const e of a.fehler) items.push({ t: e.t, kind: "error", html: `${e.coin ? `<b>${esc(e.coin)}</b> ` : ""}${esc(e.kategorie)} <span>· ${e.behoben ? "selbst behoben (" + esc(e.korrektur) + ")" : esc(e.korrektur || "übersprungen")}</span>` });
     for (const c of d.lernen.aenderungen) items.push({ t: c.t, kind: "learn", html: `<b>${esc((PARAM_NAMES[c.param] || [c.param])[0])}</b> ${esc(c.old)} → ${esc(c.new)} <span>· ${c.source === "ki" ? "KI" : "gelernt"}: ${esc(c.reason)}</span>` });
+    for (const e of (d.meme && d.meme.ereignisse) || []) {
+      const s = `<b>${esc(e.symbol || short(e.mint))}</b>`;
+      if (e.kind === "buy") items.push({ t: e.t, kind: "meme", html: `${s} gekauft <span>· ${sol(e.sol)} · von ${short(e.wallet)}${e.lag != null ? ` · Einstieg ${signedPct(e.lag)} vs. Trader` : ""}</span>` });
+      else if (e.kind === "sell") items.push({ t: e.t, kind: "meme", html: `${s} verkauft <span class="${cls(e.pnl_sol)}">${signedSol(e.pnl_sol)} (${signedPct(e.pct, 0)})</span> <span>· ${esc(e.reason)}</span>` });
+      else if (e.kind === "skip") items.push({ t: e.t, kind: "skip", html: `${s} nicht kopiert <span>· ${esc((e.reasons || []).join("; "))}</span>` });
+      else items.push({ t: e.t, kind: "error", html: `${s} <span>· ${esc(e.text)}</span>` });
+    }
     return items.sort((x, y) => y.t - x.t);
   }
 
   function feedPanel(d) {
-    const map = { alle: null, trades: "trade", stops: "stop", fehler: "error", lernen: "learn" };
-    const items = feedItems(d).filter((i) => !map[ui.filter] || i.kind === map[ui.filter]).slice(0, 80);
+    const map = { alle: null, trades: "trade", memes: ["meme", "skip"], stops: "stop", fehler: "error", lernen: "learn" };
+    const want = map[ui.filter];
+    const items = feedItems(d).filter((i) => !want || (Array.isArray(want) ? want.includes(i.kind) : i.kind === want)).slice(0, 80);
     return `
     <div class="panel">
       <div class="section-head pad" style="margin:0;padding-bottom:6px"><h2>Aktivität</h2>
@@ -500,6 +559,27 @@
         fehler: [{ t: now - 7 * h, coin: "SOL", kategorie: "zu_wenig_margin", korrektur: "Größe halbiert", behoben: true }],
       },
       sperren: { cooldown: {}, quarantaene: {}, aussortiert: {} },
+      meme: {
+        aktiv: true, sol: 1.412, start_sol: 2.0, wert_sol: 2.318, sol_usd: 182.4,
+        tag: { pnl_sol: 0.0861, buys: 6 },
+        positionen: [
+          { mint: "8dL1kqGmQbE3tVz7Hj2pW4nX6rS9cFyU1aB5oKpump", symbol: "GIGACAT", cost_sol: 0.0251, value_sol: 0.0846, pnl_pct: 2.37, tp_done: true, leader: "7vYqZ1oWm3xKp9eTn4bF2sHd8cJr5uLa6gEi1MpQx3Ws", opened: now - 3.2 * h },
+          { mint: "4pXr9TkqW2nB7mVc5eHy1Lz8sD3fGjA6uRoN2Ypump", symbol: "WOJAK", cost_sol: 0.0503, value_sol: 0.0582, pnl_pct: 0.157, tp_done: false, leader: "3kHn8RwPz5qLe1vXc7bJt2mYd9sFg4aUo6NiQeTr8Bm", opened: now - 1.1 * h },
+          { mint: "9sGh2LmP4wQx7cVb1nKe5rTy8uIo3aZd6fJp1Hpump", symbol: "MOONDOG", cost_sol: 0.0503, value_sol: 0.0381, pnl_pct: -0.243, tp_done: false, leader: "7vYqZ1oWm3xKp9eTn4bF2sHd8cJr5uLa6gEi1MpQx3Ws", opened: now - 0.4 * h },
+        ],
+        wallets: [
+          { adresse: "7vYqZ1oWm3xKp9eTn4bF2sHd8cJr5uLa6gEi1MpQx3Ws", copied: 21, skipped: 34, trades: 18, wins: 8, pnl_sol: 0.412, gesperrt: false },
+          { adresse: "3kHn8RwPz5qLe1vXc7bJt2mYd9sFg4aUo6NiQeTr8Bm", copied: 12, skipped: 19, trades: 11, wins: 4, pnl_sol: -0.061, gesperrt: false },
+          { adresse: "Fz2wQe8Rt5yUi1oPa4sDf7gHj3kLz6xCv9bNm2QwEr4T", copied: 9, skipped: 40, trades: 9, wins: 2, pnl_sol: -0.268, gesperrt: true },
+        ],
+        ereignisse: [
+          { t: now - 0.4 * h, kind: "buy", symbol: "MOONDOG", mint: "9sG", sol: 0.0503, wallet: "7vYqZ1oWm3xKp9eTn4bF2sHd8cJr5uLa6gEi1MpQx3Ws", lag: 0.064 },
+          { t: now - 0.6 * h, kind: "skip", symbol: "RUGME", mint: "x", reasons: ["Entwickler kann neue Tokens drucken (Mint Authority aktiv)", "zu wenig Liquidität (6.200 $)"] },
+          { t: now - 0.9 * h, kind: "sell", symbol: "GIGACAT", mint: "8dL", pnl_sol: 0.0298, pct: 1.18, reason: "Take-Profit +118 % – Einsatz gesichert" },
+          { t: now - 1.4 * h, kind: "skip", symbol: "PNUT2", mint: "y", reasons: ["Kurs schon +41 % seit Kauf des Traders"] },
+          { t: now - 2.2 * h, kind: "sell", symbol: "FROGE", mint: "z", pnl_sol: -0.0177, pct: -0.35, reason: "Stop-Loss -35 %" },
+        ],
+      },
     };
   }
 

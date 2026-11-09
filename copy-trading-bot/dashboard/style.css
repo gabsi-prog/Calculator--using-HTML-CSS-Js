@@ -5,7 +5,7 @@
   --fg: #e4edeb; --muted: #8aa09f; --faint: #5d7473;
   --accent: #e3a948; --accent-soft: rgba(227, 169, 72, .14); --accent-ink: #1b1306;
   --up: #4cc38a; --up-soft: rgba(76, 195, 138, .14); --down: #ef6a5b; --down-soft: rgba(239, 106, 91, .14);
-  --warn: #e8c24a; --warn-soft: rgba(232, 194, 74, .15); --info: #72b6dc;
+  --warn: #e8c24a; --warn-soft: rgba(232, 194, 74, .15); --info: #72b6dc; --meme: #b48cf2;
   --shadow: 0 1px 0 rgba(255,255,255,.03) inset, 0 12px 32px -18px rgba(0,0,0,.7);
   --f-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
   --f-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
@@ -19,7 +19,7 @@
     --fg: #102120; --muted: #536a68; --faint: #7f9593;
     --accent: #a5690c; --accent-soft: rgba(165, 105, 12, .1); --accent-ink: #ffffff;
     --up: #17834f; --up-soft: rgba(23, 131, 79, .1); --down: #c23b2d; --down-soft: rgba(194, 59, 45, .09);
-    --warn: #9a7300; --warn-soft: rgba(154, 115, 0, .1); --info: #2a76a3;
+    --warn: #9a7300; --warn-soft: rgba(154, 115, 0, .1); --info: #2a76a3; --meme: #7a4fc7;
     --shadow: 0 1px 2px rgba(16,33,32,.05), 0 10px 28px -20px rgba(16,33,32,.35);
     color-scheme: light;
   }
@@ -29,7 +29,7 @@
   --fg: #102120; --muted: #536a68; --faint: #7f9593;
   --accent: #a5690c; --accent-soft: rgba(165, 105, 12, .1); --accent-ink: #ffffff;
   --up: #17834f; --up-soft: rgba(23, 131, 79, .1); --down: #c23b2d; --down-soft: rgba(194, 59, 45, .09);
-  --warn: #9a7300; --warn-soft: rgba(154, 115, 0, .1); --info: #2a76a3;
+  --warn: #9a7300; --warn-soft: rgba(154, 115, 0, .1); --info: #2a76a3; --meme: #7a4fc7;
   --shadow: 0 1px 2px rgba(16,33,32,.05), 0 10px 28px -20px rgba(16,33,32,.35);
   color-scheme: light;
 }
@@ -175,6 +175,19 @@ main { display: grid; gap: 22px; padding-block: 20px 40px; }
 .warnings li { padding-left: 14px; position: relative; font-size: .88rem; }
 .warnings li::before { content: ""; position: absolute; left: 0; top: .55em; width: 6px; height: 6px; border-radius: 50%; background: var(--warn); }
 
+/* ---------- Memecoins ---------- */
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.kpis > div { padding: 16px 18px; display: grid; gap: 4px; border-right: 1px solid var(--line); min-width: 0; }
+.kpis > div:last-child { border-right: 0; }
+.kpi { font: 650 1.3rem/1.2 var(--f-display); font-variant-numeric: tabular-nums; }
+.kpis small { font-size: .78rem; }
+.meme-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; margin-top: 14px; }
+a.coin { color: var(--fg); text-decoration: none; border-bottom: 1px dashed var(--line-2); }
+a.coin:hover { color: var(--accent); border-color: var(--accent); }
+code { font-family: var(--f-mono); font-size: .85em; background: var(--surface-2); padding: 1px 5px; border-radius: 5px; }
+.feed .k.meme { background: var(--meme); }
+.feed .k.skip { background: var(--faint); }
+
 /* ---------- Tabellen ---------- */
 .two { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 16px; }
 .table-scroll { overflow-x: auto; }
@@ -226,6 +239,9 @@ footer { color: var(--faint); font-size: .78rem; padding-block: 0 30px; display:
 @media (max-width: 1000px) {
   .account, .two { grid-template-columns: minmax(0, 1fr); }
   .gauges { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kpis > div:nth-child(2) { border-right: 0; }
+  .kpis > div:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
   .agents { grid-template-columns: minmax(0, 1fr); }
   .chief { grid-template-columns: minmax(0, 1fr); }
   .chief-side { border-right: 0; border-bottom: 1px solid var(--line); grid-template-columns: auto auto; align-items: center; }

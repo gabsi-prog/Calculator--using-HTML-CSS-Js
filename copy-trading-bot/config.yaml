@@ -77,6 +77,44 @@ learning:
 ai_review:
   auto_apply: true            # Vorschläge automatisch übernehmen (immer innerhalb der Grenzen)
 
+# ---------- Memecoin-Bot (Solana) ----------
+# Kopiert die Käufe/Verkäufe von Solana-Wallets, die du z. B. in FOMO oder Axiom gefunden hast.
+# Handelt direkt on-chain über Jupiter. Läuft NUR im Dauerbetrieb (Server/PC) – für Memecoins
+# zählen Sekunden, GitHub Actions (alle 5 min) ist dafür zu langsam.
+# ACHTUNG: Memecoins sind extrem riskant. Die meisten fallen auf null. Nur Spielgeld einsetzen!
+meme:
+  enabled: false              # einschalten, sobald du Wallets eingetragen hast
+  paper_start_sol: 2.0        # Spielgeld im Paper-Modus (SOL)
+  wallets: []                 # Wallet-Adressen der Trader, z. B. aus FOMO-Profilen oder dem Axiom-Wallet-Tracker
+  #  - "AdresseVonTrader1..."
+  poll_sec: 3                 # wie oft die Wallets geprüft werden
+  rpc_url: "https://api.mainnet-beta.solana.com"   # besser: eigene Helius-URL (kostenlos, schneller)
+  # --- Einsatz ---
+  sol_per_trade: 0.05         # Einsatz pro Kauf
+  min_leader_buy_sol: 0.2     # nur kopieren, wenn der Trader mind. so viel kauft (Spielereien ignorieren)
+  max_open_positions: 8
+  max_buys_per_day: 25
+  daily_loss_limit_sol: 0.5   # ab diesem Tagesverlust keine neuen Käufe bis morgen
+  # --- Ausstieg ---
+  stop_loss_pct: 0.35         # -35 % -> alles verkaufen
+  take_profit_pct: 1.0        # +100 % -> Hälfte verkaufen (Einsatz gesichert)
+  trailing_stop_pct: 0.30     # danach: 30 % unter dem Höchststand -> Rest verkaufen
+  max_hold_hours: 24          # spätestens nach 24 h raus
+  follow_leader_sells: true   # verkauft der Trader, verkaufst du anteilig mit
+  # --- Sicherheits-Checks vor jedem Kauf ---
+  max_signal_age_sec: 45      # Kauf des Traders ist älter -> zu spät, nicht hinterherlaufen
+  max_chase_pct: 0.25         # Kurs seit dem Kauf des Traders schon >25 % gestiegen -> nicht kaufen
+  min_liquidity_usd: 15000
+  max_price_impact_pct: 0.05
+  require_mint_revoked: true  # Entwickler darf keine neuen Tokens drucken
+  require_freeze_revoked: true # Entwickler darf deine Tokens nicht einfrieren
+  block_rugcheck_danger: true # RugCheck meldet "danger" -> nicht kaufen
+  slippage_bps: 300           # 3 % max. Slippage
+  # --- Trader aussortieren ---
+  drop_leader_loss_sol: 0.25  # Wallet hat dir so viel SOL verloren -> 14 Tage Pause
+  bench_days: 14
+  jupiter_api: "https://lite-api.jup.ag"
+
 # ---------- KI-Agenten-Team (Claude) ----------
 # Markt-Analyst, Nachrichten-Analyst (Websuche), Trader-Analyst und Risiko-Chef.
 # Der Risiko-Chef kann den Bot nur BREMSEN (kleinere Positionen, Coins sperren), nie verstärken.

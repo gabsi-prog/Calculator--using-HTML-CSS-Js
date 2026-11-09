@@ -36,6 +36,7 @@ class CopyBot:
             self.state.setdefault(k, v)
         self.healer = Healer(self.state, self.notifier)
         self.lock = threading.RLock()  # Agenten-Thread & Handels-Schleife teilen sich den Zustand
+        self.meme = None               # Memecoin-Engine (nur im Dauerbetrieb)
 
     @property
     def ecfg(self) -> dict:
@@ -329,6 +330,11 @@ class CopyBot:
         errors = self.healer.daily_summary_and_reset()
         log_event(self.state, "days", {"t": time.time(), "datum": today, "equity": round(equity, 2),
                                        "peak": round(self.state.get("peak_equity", equity), 2)}, limit=400)
+        if self.meme:
+            ms = self.meme.summary()
+            learn_notes = learn_notes + [
+                f"Memecoins: {ms['wert_sol']:.3f} SOL Wert, heute {ms['tag'].get('pnl_sol', 0):+.4f} SOL, "
+                f"{len(ms['positionen'])} offen, {ms['tag'].get('buys', 0)} Käufe"]
         text = self.report_text(mids) + "\n\n🧠 Selbst-Analyse:\n" + "\n".join(
             [f"• {n}" for n in learn_notes] or ["• heute nichts angepasst (zu wenig Daten oder alles im Rahmen)"]
         ) + f"\n• {errors}"
@@ -364,6 +370,7 @@ class CopyBot:
             except OSError as e:
                 log.warning("Dashboard konnte nicht starten: %s", e)
         self._start_agent_thread()
+        self.start_meme()
         subscribed = None
         while not self.halted:
             try:
@@ -397,6 +404,19 @@ class CopyBot:
         with self.lock:
             self.broker.save()
         return text
+
+    def start_meme(self) -> bool:
+        """Startet den Memecoin-Bot in einem eigenen Thread (eigener Zustand, eigene Limits)."""
+        if not self.cfg.get("meme", {}).get("enabled"):
+            return False
+        if not self.cfg["meme"].get("wallets"):
+            log.warning("Memecoin-Bot: keine Wallets in config.yaml eingetragen – nicht gestartet")
+            return False
+        from .agents.team import active_overlay as _ov
+        from .meme.engine import MemeEngine
+        self.meme = MemeEngine(self.cfg, self.notifier, overlay_fn=lambda: _ov(self.state))
+        threading.Thread(target=self.meme.run_forever, daemon=True, name="meme").start()
+        return True
 
     def _start_agent_thread(self):
         acfg = self.cfg.get("agents", {})

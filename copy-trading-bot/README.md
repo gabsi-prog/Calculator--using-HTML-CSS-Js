@@ -31,6 +31,17 @@ Kaufen sie, kauft der Bot. Kaufen sie nach, kauft er nach. Verkaufen, schließen
 5. **Telegram:** Nachricht bei jedem Trade, Stop-Loss und Kill-Switch sowie ein Tagesbericht
 6. **WebSocket:** Im Dauerbetrieb reagiert der Bot sofort, sobald ein Trader handelt
 
+## 🐸 Memecoin-Bot (Solana)
+
+Kopiert Solana-Wallets, die du in **FOMO** oder **Axiom** gefunden hast. Beide Apps haben keine offizielle Bot-Schnittstelle, deshalb handelt der Bot direkt on-chain (`copybot/meme/`):
+- **Erkennen:** Solana-RPC → neue Transaktionen der Wallets → Kauf/Verkauf aus den Token- und SOL-Salden (SOL, WSOL und USDC/USDT als Gegenwährung)
+- **Prüfen:** DexScreener (Liquidität, Kurs-Jagd), Mint-/Freeze-Authority per RPC, RugCheck, Jupiter-Preiseinfluss, Signal-Alter, Tages- und Positionslimits
+- **Handeln:** Jupiter-Swap, signiert mit einer eigenen Bot-Wallet (`solders`). Im Paper-Modus mit echten Jupiter-Kursen.
+- **Aussteigen:** Stop-Loss, halber Take-Profit, Trailing-Stop, Zeitlimit, anteiliges Mitverkaufen mit dem Trader
+- **Lernen:** Wallets mit Verlust werden pausiert. Das KI-Team bekommt die Memecoin-Daten und kann über `memecoin_faktor` Käufe drosseln oder stoppen.
+
+Läuft nur im Dauerbetrieb (`python -m copybot` oder `--meme`), weil bei Memecoins Sekunden zählen. Hilfen: `--meme-wallet ADRESSE`, `--meme-check MINT`.
+
 ## 🧑‍💼 KI-Agenten-Team
 
 Alle 8 Stunden (einstellbar) arbeitet ein Team aus Claude-Agenten:
@@ -90,6 +101,9 @@ python -m copybot --lernstand     # was hat der Bot gelernt?
 python -m copybot --reset-lernen  # Gelerntes vergessen
 python -m copybot --agenten       # KI-Team jetzt analysieren lassen
 python -m copybot --dashboard     # nur das Dashboard starten
+python -m copybot --meme          # nur Memecoin-Bot + Dashboard
+python -m copybot --meme-wallet A # erkannte Swaps einer Wallet anzeigen
+python -m copybot --meme-check M  # Sicherheits-Check eines Tokens
 ```
 
 Ohne eigenen Rechner läuft der Bot über **GitHub Actions** (`.github/workflows/copybot.yml`) alle 5 Minuten.

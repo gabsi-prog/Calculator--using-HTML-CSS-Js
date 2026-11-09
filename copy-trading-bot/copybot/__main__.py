@@ -12,6 +12,9 @@
   python -m copybot --agenten       KI-Agenten-Team jetzt analysieren lassen
   python -m copybot --dashboard     nur das Web-Dashboard starten (ohne zu handeln)
   python -m copybot --export-dashboard ORDNER   Dashboard + Daten als statische Website exportieren
+  python -m copybot --meme          nur den Memecoin-Bot (+ Dashboard) starten
+  python -m copybot --meme-check MINT        Sicherheits-Check für einen Token
+  python -m copybot --meme-wallet ADRESSE    letzte Käufe/Verkäufe einer Wallet anzeigen
 """
 import argparse
 import logging
@@ -61,6 +64,9 @@ def main():
     g.add_argument("--agenten", action="store_true")
     g.add_argument("--dashboard", action="store_true")
     g.add_argument("--export-dashboard", metavar="ORDNER")
+    g.add_argument("--meme", action="store_true")
+    g.add_argument("--meme-check", metavar="MINT")
+    g.add_argument("--meme-wallet", metavar="ADRESSE")
     args = ap.parse_args()
 
     load_env()
@@ -114,6 +120,39 @@ def main():
         from .dashboard import export_site
         export_site(bot, args.export_dashboard)
         print(f"Dashboard exportiert nach {args.export_dashboard}")
+    elif args.meme:
+        import time as _t
+        if not bot.start_meme():
+            raise SystemExit("Memecoin-Bot ist aus: in config.yaml meme.enabled: true setzen und Wallets eintragen.")
+        if cfg.get("dashboard", {}).get("enabled", True):
+            from .dashboard import start_server
+            start_server(bot, cfg.get("dashboard", {}).get("port", 8080))
+        while True:
+            _t.sleep(3600)
+    elif args.meme_check:
+        from .meme.chain import MarketData, SolanaRPC
+        from .meme.safety import check_token
+        mc = cfg["meme"]
+        ok, reasons, info = check_token(args.meme_check, MarketData(mc["jupiter_api"]), SolanaRPC(mc["rpc_url"]), mc)
+        print(f"{info.get('symbol', '?')} – {'✅ würde gekauft' if ok else '❌ würde NICHT gekauft'}")
+        for r in reasons:
+            print("  •", r)
+        for k in ("liquidity_usd", "price_usd", "fdv", "dex", "url"):
+            if info.get(k) is not None:
+                print(f"  {k}: {info[k]}")
+    elif args.meme_wallet:
+        from .meme.chain import MarketData, SolanaRPC
+        from .meme.parse import parse_swap
+        mc = cfg["meme"]
+        rpc, market = SolanaRPC(mc["rpc_url"]), MarketData(mc["jupiter_api"])
+        sol_usd = market.sol_usd()
+        found = 0
+        for s in rpc.signatures(args.meme_wallet, limit=25):
+            ev = None if s.get("err") else parse_swap(rpc.transaction(s["signature"]), args.meme_wallet, sol_usd)
+            if ev:
+                found += 1
+                print(f"{ev['side'].upper():4}  {ev['mint']}  {ev['quote_sol']:.3f} SOL  ({s.get('blockTime')})")
+        print(f"{found} Swaps in den letzten 25 Transaktionen erkannt.")
     elif args.lernstand:
         print(lernstand(bot))
     elif args.reset_lernen:

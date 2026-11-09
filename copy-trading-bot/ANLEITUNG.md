@@ -192,6 +192,89 @@ Nützliche Befehle auf dem Server:
 
 ---
 
+## Memecoins (Solana) mit FOMO und Axiom
+
+FOMO und Axiom haben **keine offizielle Schnittstelle** für Bots. Darum arbeitet der Bot so:
+- **Du** findest in FOMO oder Axiom gute Trader und kopierst ihre **Wallet-Adresse**.
+- **Der Bot** beobachtet diese Wallets direkt auf der Solana-Blockchain. Jeder Kauf dort ist öffentlich sichtbar.
+- Kauft eine Wallet einen Memecoin, prüft der Bot den Token und kauft über **Jupiter** mit einer **eigenen Bot-Wallet** nach.
+
+> ⚠️ **Ehrlich:** Memecoins sind das riskanteste, was man traden kann. Die meisten Tokens fallen auf null.
+> Viele „Top-Wallets“ sind Insider, die verkaufen, sobald Nachahmer kaufen. Beim Kopieren bist du immer ein paar Sekunden später dran.
+> Setz nur Geld ein, das du komplett verlieren kannst, und lass den Bot zuerst einige Wochen im Paper-Modus laufen.
+
+### Schritt M1: Gute Wallets finden
+
+**In FOMO:** Auf das Profil eines Traders tippen und die Wallet-Adresse kopieren.
+**In Axiom:** Unter *Wallet Tracker* bzw. im Profil eines Traders die Adresse kopieren.
+
+Worauf du achten solltest:
+- Seit **Wochen** im Plus, nicht nur ein Glückstreffer
+- Kauft Beträge ab ca. 0,5 SOL, also echte Überzeugung statt Spielerei
+- Hält Tokens **Minuten bis Stunden**, nicht nur Sekunden. Sekunden-Trader sind Bots, die kann man nicht kopieren.
+
+Prüfen, was der Bot bei einer Wallet erkennen würde:
+```
+python -m copybot --meme-wallet ADRESSE
+```
+
+### Schritt M2: Kostenlosen schnellen Solana-Zugang holen (empfohlen)
+
+Der öffentliche Solana-Zugang ist langsam und begrenzt. Hol dir einen kostenlosen Zugang:
+1. Auf **helius.dev** registrieren (Free-Plan).
+2. Die **RPC-URL** kopieren (sieht aus wie `https://mainnet.helius-rpc.com/?api-key=...`).
+3. In `config.yaml` bei `meme.rpc_url` eintragen. Auf dem Server liegt die Datei dort; teile die URL mit niemandem.
+
+### Schritt M3: Einstellen und im Paper-Modus testen
+
+In `config.yaml` unter `meme:`
+```yaml
+meme:
+  enabled: true
+  wallets:
+    - "ErsteWalletAdresse..."
+    - "ZweiteWalletAdresse..."
+```
+Alle anderen Werte (Einsatz, Stop-Loss, Sicherheits-Checks) sind dort auf Deutsch erklärt.
+
+**Wichtig:** Memecoins brauchen **Dauerbetrieb**, also den Oracle-Server aus Phase 3 oder einen PC, der durchläuft.
+Bei Memecoins zählen Sekunden. GitHub Actions läuft nur alle 5 Minuten, das ist dafür viel zu langsam.
+
+Starten:
+```
+python -m copybot          # Hyperliquid-Bot + Memecoin-Bot + Dashboard
+python -m copybot --meme   # nur Memecoins + Dashboard
+```
+
+Einen einzelnen Token prüfen:
+```
+python -m copybot --meme-check TOKENADRESSE
+```
+
+### Schritt M4: Live (erst nach erfolgreichem Test!)
+
+1. In **Phantom** oder **Solflare** ein **neues, separates Konto** nur für den Bot anlegen. Nie deine Haupt-Wallet benutzen!
+2. Nur einen kleinen Betrag SOL darauf überweisen, z. B. 0,5 SOL.
+3. Den **Private Key** dieses Kontos exportieren (Phantom: Einstellungen → Konto → Private Key anzeigen).
+4. Auf dem Server in `.env` eintragen: `SOLANA_PRIVATE_KEY=...`
+5. `mode: live` setzen und den Bot neu starten.
+
+Was der Bot kauft, siehst du im Dashboard, per Telegram und in Phantom/Solflare. In FOMO oder Axiom kannst du die Bot-Wallet-Adresse wie jede andere Wallet beobachten.
+
+### Was der Bot zu deinem Schutz macht
+
+| Schutz | Wirkung |
+|---|---|
+| Mint/Freeze-Check | Kauft nicht, wenn der Entwickler neue Tokens drucken oder deine Tokens einfrieren kann |
+| RugCheck | Kauft nicht bei „danger“-Warnungen (z. B. ein Halter besitzt fast alles) |
+| Liquidität | Mindestens 15.000 $, damit du auch wieder verkaufen kannst |
+| Nicht hinterherlaufen | Signal älter als 45 s oder Kurs schon +25 % → kein Kauf |
+| Preiseinfluss | Kauf würde den Preis um mehr als 5 % bewegen → kein Kauf |
+| Ausstieg | −35 % Stop-Loss · bei +100 % die Hälfte verkaufen (Einsatz gesichert) · danach Trailing-Stop 30 % · max. 24 h halten |
+| Trader folgen | Verkauft der Trader, verkaufst du anteilig mit |
+| Limits | max. 8 offene Positionen, 25 Käufe pro Tag, Tagesverlust-Limit 0,5 SOL |
+| Selbstkontrolle | Wallets, die dir Verlust bringen, werden 14 Tage pausiert. Der KI-Risiko-Chef kann Memecoin-Käufe stoppen. |
+
 ## Probleme?
 
 | Problem | Lösung |
