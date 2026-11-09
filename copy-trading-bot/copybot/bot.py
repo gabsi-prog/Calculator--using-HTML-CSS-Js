@@ -8,9 +8,12 @@ import time
 
 from .broker import LiveBroker, PaperBroker
 from .hl_api import HyperliquidData
+from .healer import Healer
+from .learner import daily_learning, leader_weights, risk_throttle
 from .notify import Notifier
 from .selector import holding_stats, is_scalper, rank_traders
 from .strategy import apply_risk, plan_orders, target_exposures
+from .tuning import effective_cfg, log_event
 
 log = logging.getLogger("copybot")
 
@@ -27,9 +30,15 @@ class CopyBot:
             self.broker = PaperBroker(cfg["state_file"], cfg["paper_start_balance"])
         self.notifier = notifier or Notifier()
         for k, v in {"leaders": [], "last_select": 0.0, "cooldown": {}, "trader_stats": {}, "benched": {},
-                     "attrib": {}, "halted": False, "last_positions": {}}.items():
+                     "attrib": {}, "halted": False, "last_positions": {}, "last_entries": {},
+                     "weights": {}, "overrides": {}}.items():
             self.state.setdefault(k, v)
-        self._last_error_note = 0.0
+        self.healer = Healer(self.state, self.notifier)
+
+    @property
+    def ecfg(self) -> dict:
+        """Aktuell gültige Einstellungen (config.yaml + selbst gelernte Werte)."""
+        return effective_cfg(self.cfg, self.state)
 
     @property
     def state(self) -> dict:
@@ -49,7 +58,7 @@ class CopyBot:
         due = now - self.state["last_select"] > self.cfg["reselect_interval_hours"] * 3600
         if not (force or due or not self.leaders):
             return
-        sel = self.cfg["selection"]
+        sel = self.ecfg["selection"]
         benched = {a for a, until in self.state["benched"].items() if until > now}
         rows = self.data.leaderboard()
         picked = [{"address": a.lower(), "name": "fest eingestellt", "score": 0.0, "pinned": True}
@@ -88,15 +97,17 @@ class CopyBot:
 
     def _check_trader_losses(self, equity: float) -> bool:
         """Sortiert Trader aus, mit denen DU Geld verlierst."""
-        sel = self.cfg["selection"]
+        sel = self.ecfg["selection"]
         if not self.leaders:
             return False
-        alloc = equity * self.cfg["copy"]["capital_usage"] / len(self.leaders)
+        weights = leader_weights(self.state, self.leaders)
+        total_w = sum(weights.values()) or 1.0
         dropped = []
         for t in self.leaders:
             st = self.state["trader_stats"].get(t["address"])
             if t.get("pinned") or not st:
                 continue
+            alloc = equity * self.ecfg["copy"]["capital_usage"] * weights[t["address"]] / total_w
             if st["pnl"] < -sel["drop_trader_loss_pct"] * alloc:
                 self.state["benched"][t["address"]] = time.time() + sel["bench_days"] * 86400
                 dropped.append((t["address"], st["pnl"]))
@@ -132,9 +143,13 @@ class CopyBot:
         if self.halted:
             log.warning("Bot ist gestoppt (Kill-Switch). Zum Fortsetzen: --reset-halt")
             return []
+        if self.healer.in_backoff():
+            log.info("Pause wegen Rate-Limit – nächster Durchlauf")
+            return []
         self.refresh_leaders()
         mids, meta = self.data.mids(), self.data.meta()
-        risk, copy_cfg = self.cfg["risk"], self.cfg["copy"]
+        ecfg = self.ecfg
+        risk, copy_cfg = ecfg["risk"], ecfg["copy"]
         now = time.time()
         notes = []
 
@@ -149,6 +164,9 @@ class CopyBot:
             if cur == 0 or (cur > 0) != (prev > 0):
                 self.state["cooldown"][coin] = {"until": now + risk["stop_cooldown_hours"] * 3600,
                                                 "side": 1 if prev > 0 else -1}
+                log_event(self.state, "stops", {"t": now, "coin": coin, "side": 1 if prev > 0 else -1,
+                                                "px": mids.get(coin), "entry": self.state["last_entries"].get(coin),
+                                                "sl_pct": risk["stop_loss_pct"]}, limit=200)
                 notes.append(f"🛑 {coin} wurde per Stop-Loss geschlossen – {risk['stop_cooldown_hours']} h Pause für diesen Coin")
         self.state["cooldown"] = {c: v for c, v in self.state["cooldown"].items() if v["until"] > now}
 
@@ -184,20 +202,30 @@ class CopyBot:
             leader_states[t["address"]] = acc
 
         # 6) Ziel berechnen -> Risiko -> Orders
-        targets, contrib = target_exposures(leader_states, equity, copy_cfg)
+        weights = leader_weights(self.state, self.leaders)
+        targets, contrib = target_exposures(leader_states, equity, copy_cfg, weights)
         targets = {c: v for c, v in targets.items() if c in meta}
+        if ecfg.get("learning", {}).get("risk_throttle", True):
+            factor = risk_throttle(dd, risk["max_drawdown_pct"])
+            if factor < 1:
+                log.info("Risikobremse aktiv: Positionen auf %.0f %% (Drawdown %s)", factor * 100, _pct(dd))
+                targets = {c: v * factor for c, v in targets.items()}
         for coin, cd in self.state["cooldown"].items():
             if coin in targets and (targets[coin] > 0) == (cd["side"] > 0):
                 targets.pop(coin)
         targets = apply_risk(targets, equity, risk)
         orders = plan_orders(targets, current, mids, copy_cfg, risk["close_on_leader_exit"])
+        quarantined = self.healer.quarantined()
+        orders = [o for o in orders if o["coin"] not in quarantined]
 
         names = {"open": "🟢 Eröffnet", "increase": "➕ Nachgekauft", "reduce": "➖ Reduziert",
                  "close": "⚪ Geschlossen", "flip": "🔄 Gedreht"}
         for o in orders:
             side = "LONG" if (current.get(o["coin"], 0) + o["sz"]) > 0 else "SHORT"
             log.info("-> %s %s: %+.6g (%s)", o["reason"].upper(), o["coin"], o["sz"], _usd(abs(o["sz"]) * o["px"]))
-            if self.broker.execute(o["coin"], o["sz"], o["px"], meta[o["coin"]]["szDecimals"], copy_cfg["slippage"]):
+            if self.healer.execute_with_healing(self.broker, o["coin"], o["sz"], o["px"],
+                                                meta[o["coin"]]["szDecimals"], copy_cfg["slippage"]):
+                self._journal_trade(o, side, contrib, leader_states, now)
                 notes.append(f"{names[o['reason']]} {o['coin']} {'' if o['reason'] == 'close' else side} "
                              f"({_usd(abs(o['sz']) * o['px'])})")
 
@@ -211,12 +239,34 @@ class CopyBot:
 
         after = self.broker.positions()
         self.state["last_positions"] = after
+        self.state["last_entries"] = {d["coin"]: d["entryPx"] for d in self.broker.position_details(mids)}
         self._save_attribution(after, mids, contrib)
         if notes and self.cfg.get("telegram", {}).get("notify_trades", True):
             self.notifier.send("\n".join(notes) + f"\nKonto: {_usd(self.broker.equity(mids))}")
         self._maybe_daily_report(mids)
+        self.healer.cycle_ok()
         self.broker.save()
         return orders
+
+    def _journal_trade(self, o, side, contrib, leader_states, now):
+        """Tagebuch + Messung der Verzögerungs-Kosten: Wie viel schlechter steige ich ein als der Trader?"""
+        coin, lag = o["coin"], None
+        if o["reason"] in ("open", "increase", "flip"):
+            sgn = 1 if side == "LONG" else -1
+            lags = {}
+            for addr, usd in contrib.get(coin, {}).items():
+                lp = leader_states.get(addr, {}).get("positions", {}).get(coin)
+                if lp and lp.get("entryPx") and (usd > 0) == (sgn > 0):
+                    lags[addr] = sgn * (o["px"] - lp["entryPx"]) / lp["entryPx"]
+            for addr, lg in lags.items():
+                st = self.state["trader_stats"].setdefault(addr, {"pnl": 0.0, "since": now})
+                st["lag_sum"] = st.get("lag_sum", 0.0) + lg
+                st["lag_n"] = st.get("lag_n", 0) + 1
+            if lags:
+                lag = sum(lags.values()) / len(lags)
+        log_event(self.state, "trades", {"t": now, "coin": coin, "reason": o["reason"], "side": side,
+                                         "usd": round(abs(o["sz"]) * o["px"], 2), "px": o["px"],
+                                         "lag": None if lag is None else round(lag, 5)}, limit=1000)
 
     # ------------------------------------------------------------------ Berichte
     def report_text(self, mids=None) -> str:
@@ -238,7 +288,11 @@ class CopyBot:
         lines.append("\nGewinn je Trader (für dich):")
         for t in self.leaders:
             st = self.state["trader_stats"].get(t["address"], {})
-            lines.append(f"• {t['address'][:10]}…  {st.get('pnl', 0):+.2f} USD")
+            lines.append(f"• {t['address'][:10]}…  {st.get('pnl', 0):+.2f} USD  "
+                         f"(Gewicht {self.state['weights'].get(t['address'], 1.0):.2f})")
+        if self.state.get("overrides"):
+            lines.append("\nSelbst gelernte Einstellungen:")
+            lines += [f"• {k} = {v}" for k, v in self.state["overrides"].items()]
         if self.halted:
             lines.append("\n🚨 Bot ist gestoppt (Kill-Switch).")
         return "\n".join(lines)
@@ -250,9 +304,17 @@ class CopyBot:
         self.state.setdefault("start_equity", self.broker.equity(mids))
         if self.state.get("last_report") == today or now.hour < hour:
             return
-        self.notifier.send(self.report_text(mids))
+        equity = self.broker.equity(mids)
+        learn_notes = daily_learning(self, mids, equity)
+        errors = self.healer.daily_summary_and_reset()
+        log_event(self.state, "days", {"t": time.time(), "datum": today, "equity": round(equity, 2),
+                                       "peak": round(self.state.get("peak_equity", equity), 2)}, limit=400)
+        text = self.report_text(mids) + "\n\n🧠 Selbst-Analyse:\n" + "\n".join(
+            [f"• {n}" for n in learn_notes] or ["• heute nichts angepasst (zu wenig Daten oder alles im Rahmen)"]
+        ) + f"\n• {errors}"
+        self.notifier.send(text)
         self.state["last_report"] = today
-        self.state["equity_at_report"] = self.broker.equity(mids)
+        self.state["equity_at_report"] = equity
 
     def reset_halt(self):
         mids = self.data.mids()
@@ -278,14 +340,12 @@ class CopyBot:
         while not self.halted:
             try:
                 self.step()
-                self._last_error_note = 0.0
             except KeyboardInterrupt:
                 raise
             except Exception as e:
                 log.exception("Fehler im Durchlauf – nächster Versuch gleich")
-                if time.time() - self._last_error_note > 3600:
-                    self.notifier.send(f"⚠️ Fehler im Bot: {e}")
-                    self._last_error_note = time.time()
+                self.healer.cycle_failed(e)
+                self.broker.save()
             current = {t["address"] for t in self.leaders}
             if watcher and current != subscribed:
                 if subscribed is None:

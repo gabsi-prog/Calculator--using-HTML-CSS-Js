@@ -63,6 +63,20 @@ telegram:
   notify_trades: true
   daily_report_hour_utc: 18   # 18 UTC = 19 Uhr (Winter) / 20 Uhr (Sommer) deutsche Zeit
 
+# ---------- Selbst-Lernen ----------
+# Der Bot passt sich täglich selbst an. Er darf dabei VORSICHTIGER werden, aber nie riskanter
+# als die Werte oben (Ausnahme: Stop-Loss-Abstand lernt zwischen 4 % und 15 %).
+learning:
+  enabled: true
+  risk_throttle: true         # bei Verlusten automatisch kleinere Positionen (jede Sekunde)
+  weight_learning_rate: 2.0   # wie schnell gute Trader mehr Kapital bekommen
+  min_samples: 3              # erst ab so vielen Beispielen etwas ändern
+
+# ---------- Wöchentliche KI-Analyse (Claude) ----------
+# Braucht ANTHROPIC_API_KEY (console.anthropic.com). Kosten: wenige Cent pro Woche.
+ai_review:
+  auto_apply: true            # Vorschläge automatisch übernehmen (immer innerhalb der Grenzen)
+
 # ---------- Backtest ----------
 backtest:
   delay_penalty: 0.001        # 0,1 % schlechterer Preis je Trade (Verzögerung beim Kopieren)

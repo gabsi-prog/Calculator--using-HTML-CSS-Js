@@ -7,16 +7,19 @@ Kauft er nach -> ich auch. Schließt/dreht er -> ich auch.
 from __future__ import annotations
 
 
-def target_exposures(leaders: dict[str, dict], my_equity: float, copy_cfg: dict):
+def target_exposures(leaders: dict[str, dict], my_equity: float, copy_cfg: dict, weights: dict | None = None):
     """leaders: address -> {accountValue, positions{coin:{szi, px}}}
+    weights: address -> Gewicht (gelernt; Standard 1.0 = gleich viel Kapital für jeden Trader)
     Rückgabe: (coin -> Ziel-Notional USD signiert, coin -> {address -> Beitrag USD})"""
     active = {a: d for a, d in leaders.items() if d and d["accountValue"] > 0}
     if not active or my_equity <= 0:
         return {}, {}
-    per_leader = my_equity * copy_cfg["capital_usage"] / len(active)
+    w = {a: (weights or {}).get(a, 1.0) for a in active}
+    total_w = sum(w.values()) or 1.0
     targets: dict[str, float] = {}
     contrib: dict[str, dict[str, float]] = {}
     for addr, d in active.items():
+        per_leader = my_equity * copy_cfg["capital_usage"] * w[addr] / total_w
         for coin, p in d["positions"].items():
             usd = p["szi"] * p["px"] / d["accountValue"] * per_leader * copy_cfg["copy_ratio"]
             targets[coin] = targets.get(coin, 0.0) + usd

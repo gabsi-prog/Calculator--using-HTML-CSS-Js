@@ -5,6 +5,7 @@ name: Copy-Trading-Bot
 on:
   schedule:
     - cron: "*/5 * * * *"   # alle 5 Minuten (GitHub startet oft etwas später)
+    - cron: "23 7 * * 0"    # sonntags ~8 Uhr: wöchentliche KI-Analyse
   workflow_dispatch:         # manuell starten: Tab "Actions" -> "Copy-Trading-Bot" -> "Run workflow"
     inputs:
       aktion:
@@ -18,6 +19,9 @@ on:
           - bericht
           - telegram-test
           - kill-switch-zuruecksetzen
+          - ki-analyse
+          - lernstand
+          - gelerntes-zuruecksetzen
 
 permissions:
   contents: read
@@ -59,7 +63,8 @@ jobs:
           HL_ACCOUNT_ADDRESS: ${{ secrets.HL_ACCOUNT_ADDRESS }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          AKTION: ${{ inputs.aktion || 'durchlauf' }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          AKTION: ${{ inputs.aktion || (github.event.schedule == '23 7 * * 0' && 'ki-analyse') || 'durchlauf' }}
         run: |
           case "$AKTION" in
             durchlauf)                 python -m copybot --once ;;
@@ -68,6 +73,9 @@ jobs:
             bericht)                   python -m copybot --report ;;
             telegram-test)             python -m copybot --telegram-test ;;
             kill-switch-zuruecksetzen) python -m copybot --reset-halt ;;
+            ki-analyse)                python -m copybot --ki-analyse ;;
+            lernstand)                 python -m copybot --lernstand ;;
+            gelerntes-zuruecksetzen)   python -m copybot --reset-lernen ;;
           esac
 
       - name: Bot-Gedächtnis speichern

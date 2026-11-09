@@ -31,6 +31,22 @@ Kaufen sie, kauft der Bot. Kaufen sie nach, kauft er nach. Verkaufen, schließen
 5. **Telegram:** Nachricht bei jedem Trade, Stop-Loss und Kill-Switch sowie ein Tagesbericht
 6. **WebSocket:** Im Dauerbetrieb reagiert der Bot sofort, sobald ein Trader handelt
 
+## 🧠 Selbstverbesserung
+
+Der Bot lernt auf drei Ebenen aus seinen eigenen Ergebnissen:
+
+| Wann | Was | Wie |
+|---|---|---|
+| **Jede Sekunde / jeder Durchlauf** | **Selbstheilung** | Fehlgeschlagene Orders werden erkannt und automatisch korrigiert: zu wenig Margin → halbe Größe, Preisfehler → mehr Slippage, Rundungsfehler → gröber runden, Rate-Limit → Pause. Ein Coin, der 3× in einer Stunde scheitert, kommt 6 h in Quarantäne. Fehlende Stop-Losses werden nachgesetzt. |
+| | **Risikobremse** | Bei Verlusten werden die Positionen automatisch kleiner: 50 % bei halbem Weg zum Kill-Switch, mindestens 30 %. |
+| **Täglich** | **Trader-Gewichte** | Trader, die *dir* Geld bringen, bekommen mehr Kapital, Verlierer weniger (Faktor 0,25 bis 2,5). |
+| | **Stop-Loss lernen** | 24 h nach jedem Stop prüft der Bot: Lief der Kurs danach wieder über den Einstieg (unnötiger Stop)? Viele unnötige Stops → Stop weiter. Kaum welche → enger. Grenzen: 4–15 %. |
+| | **Verzögerungs-Kosten** | Er misst, wie viel schlechter er einsteigt als der Trader. Zu teuer → kopiert nur noch Trader mit längerer Haltedauer. |
+| **Wöchentlich** | **KI-Analyse (Claude)** | Liest das Tagebuch, erklärt die Woche auf Deutsch, findet Fehlerquellen und passt bis zu 3 Einstellungen an. Probleme, die Code brauchen, werden separat gemeldet. |
+
+**Sicherheitsregel:** Gelernte Änderungen dürfen den Bot nur **vorsichtiger** machen, nie riskanter als in `config.yaml` eingestellt. Ausnahme ist der Stop-Abstand (4–15 %).
+Jede Änderung landet im Tagebuch und im Telegram-Tagesbericht. `--lernstand` zeigt den aktuellen Stand, `--reset-lernen` macht alles rückgängig.
+
 ## Befehle (eigener Rechner/Server)
 
 ```bash
@@ -46,6 +62,9 @@ python -m copybot --once          # ein Durchlauf
 python -m copybot                 # Dauerbetrieb
 python -m copybot --report        # Tagesbericht jetzt
 python -m copybot --reset-halt    # nach Kill-Switch fortsetzen
+python -m copybot --ki-analyse    # KI-Analyse jetzt
+python -m copybot --lernstand     # was hat der Bot gelernt?
+python -m copybot --reset-lernen  # Gelerntes vergessen
 ```
 
 Ohne eigenen Rechner läuft der Bot über **GitHub Actions** (`.github/workflows/copybot.yml`) alle 5 Minuten.

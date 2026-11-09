@@ -6,6 +6,9 @@
   python -m copybot --report        Tagesbericht jetzt senden
   python -m copybot --telegram-test Testnachricht an Telegram
   python -m copybot --reset-halt    Kill-Switch zurücksetzen
+  python -m copybot --ki-analyse    wöchentliche KI-Analyse jetzt ausführen
+  python -m copybot --lernstand     zeigt, was der Bot bisher gelernt hat
+  python -m copybot --reset-lernen  alles Gelernte vergessen (zurück zu config.yaml)
 """
 import argparse
 import logging
@@ -14,6 +17,7 @@ import sys
 
 import yaml
 
+from .ai_review import run_review
 from .backtest import format_results, run_backtest
 from .bot import CopyBot
 from .notify import Notifier
@@ -48,6 +52,9 @@ def main():
     g.add_argument("--report", action="store_true")
     g.add_argument("--telegram-test", action="store_true")
     g.add_argument("--reset-halt", action="store_true")
+    g.add_argument("--ki-analyse", action="store_true")
+    g.add_argument("--lernstand", action="store_true")
+    g.add_argument("--reset-lernen", action="store_true")
     args = ap.parse_args()
 
     load_env()
@@ -84,14 +91,42 @@ def main():
     elif args.reset_halt:
         bot.reset_halt()
         bot.notifier.send("🔓 Kill-Switch zurückgesetzt – Bot handelt wieder.")
+    elif args.ki_analyse:
+        text = run_review(bot)
+        print(text)
+        bot.notifier.send(text)
+        bot.broker.save()
+    elif args.lernstand:
+        print(lernstand(bot))
+    elif args.reset_lernen:
+        for k in ("overrides", "weights"):
+            bot.state[k] = {}
+        bot.broker.save()
+        print("Gelerntes zurückgesetzt – es gilt wieder config.yaml.")
+        bot.notifier.send("♻️ Gelerntes zurückgesetzt – es gilt wieder config.yaml.")
     elif args.once:
         try:
             bot.step()
         except Exception as e:
-            bot.notifier.send(f"⚠️ Fehler im Bot: {e}")
-            raise
+            logging.exception("Fehler im Durchlauf")
+            cat = bot.healer.cycle_failed(e)
+            bot.broker.save()
+            if cat in ("datenformat", "unbekannt"):
+                raise SystemExit(1)  # roter Lauf auf GitHub -> echter Fehler, der ein Update braucht
     else:
         bot.run()
+
+
+def lernstand(bot) -> str:
+    st = bot.state
+    lines = ["Selbst gelernte Einstellungen (überschreiben config.yaml):"]
+    lines += [f"  {k} = {v}" for k, v in st.get("overrides", {}).items()] or ["  keine"]
+    lines.append("Trader-Gewichte:")
+    lines += [f"  {a} = {w:.2f}" for a, w in st.get("weights", {}).items()] or ["  alle 1.0"]
+    lines.append("Letzte Änderungen:")
+    lines += [f"  {c['param']}: {c['old']} -> {c['new']} ({c['source']}: {c['reason']})"
+              for c in st.get("journal", {}).get("changes", [])[-10:]] or ["  keine"]
+    return "\n".join(lines)
 
 
 if __name__ == "__main__":

@@ -58,12 +58,27 @@ Du bekommst eine Nachricht bei jedem Trade und **jeden Abend um 19 Uhr** (Sommer
 
 > **Ein Lauf ist rot (❌)?** Klick drauf → „bot“ → „Bot ausführen“ und schick mir den Text, der dort steht.
 
+### Schritt 5 (optional): Wöchentliche KI-Analyse einschalten
+
+Einmal pro Woche (sonntags früh) liest Claude das Tagebuch des Bots, also alle Trades, Stop-Losses und Fehler.
+Claude erklärt dir auf Deutsch, was gut und was schlecht lief, und passt Einstellungen innerhalb fester Grenzen an.
+Die Kosten liegen bei wenigen Cent pro Woche.
+
+1. Auf **console.anthropic.com** ein Konto anlegen und unter **Billing** z. B. 5 $ Guthaben aufladen.
+2. **API Keys** → **Create Key** → Namen eingeben, z. B. `copybot` → Key kopieren (beginnt mit `sk-ant-`).
+3. Bei GitHub wie in Schritt 3 ein neues Secret anlegen: Name `ANTHROPIC_API_KEY`, Wert der Key.
+4. Test: In **Actions** die Aktion **`ki-analyse`** ausführen. Die Analyse kommt per Telegram.
+
+Ohne diesen Key lernt der Bot trotzdem täglich selbst. Nur die KI-Analyse fällt dann weg.
+
 ### Gut zu wissen
 
 - **Öffentliches Repository:** Die Logs (Trades und Kontostand) kann jeder sehen. Deine Schlüssel nicht. Im Test-Modus ist das egal.
 - **Privates Repository:** Dort sind nur 2000 Gratis-Minuten pro Monat drin. Stell dann in `.github/workflows/copybot.yml` `*/5` auf `*/30` um (alle 30 Minuten).
 - GitHub schaltet automatische Abläufe ab, wenn **60 Tage** lang nichts im Repository passiert. Du bekommst dann eine E-Mail und klickst auf „Enable“.
 - **Einstellungen ändern** (z. B. Anzahl der Trader oder Stop-Loss): auf github.com die Datei `copy-trading-bot/config.yaml` öffnen → Stift-Symbol → ändern → **„Commit changes“**. Jede Einstellung ist dort auf Deutsch erklärt.
+- **Was hat der Bot gelernt?** In Actions die Aktion **`lernstand`** ausführen und das Log ansehen.
+  Gefällt dir etwas nicht, setzt **`gelerntes-zuruecksetzen`** alles auf die Werte aus `config.yaml` zurück.
 - **Kill-Switch ausgelöst?** Der Bot bleibt gestoppt, bis du in Actions **`kill-switch-zuruecksetzen`** ausführst. Prüf aber vorher, warum er ausgelöst hat.
 
 ### Wie lange testen?

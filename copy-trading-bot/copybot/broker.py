@@ -68,10 +68,19 @@ class PaperBroker:
     def equity(self, mids: dict[str, float]) -> float:
         return self.state["cash"] + sum(d["upnl"] for d in self.position_details(mids))
 
+    last_error = ""
+    MIN_ORDER_USD = 10.0  # wie an der Börse
+
     def execute(self, coin, sz, px, sz_decimals=None, slippage=0.0) -> bool:
+        self.last_error = ""
         if sz_decimals is not None:
             sz = round(sz, sz_decimals)
         if sz == 0:
+            return False
+        cur = self.state["positions"].get(coin, {}).get("szi", 0.0)
+        closing = abs(cur + sz) < 1e-12
+        if abs(sz) * px < self.MIN_ORDER_USD and not closing:
+            self.last_error = "Order must have minimum value of $10"
             return False
         fill = px * (1 + slippage / 4 if sz > 0 else 1 - slippage / 4)
         fee = abs(sz) * fill * TAKER_FEE
@@ -139,18 +148,26 @@ class LiveBroker:
     def equity(self, mids) -> float:
         return float(self.info.user_state(self.address)["marginSummary"]["accountValue"])
 
+    last_error = ""
+
     def execute(self, coin, sz, px, sz_decimals=None, slippage=0.01) -> bool:
+        self.last_error = ""
         if sz_decimals is not None:
             sz = round(sz, sz_decimals)
         if sz == 0:
             return False
-        res = self.ex.market_open(coin, sz > 0, abs(sz), None, slippage)
+        try:
+            res = self.ex.market_open(coin, sz > 0, abs(sz), None, slippage)
+        except Exception as e:  # Netzwerk/SDK-Fehler -> Healer entscheidet
+            self.last_error = f"{type(e).__name__}: {e}"
+            return False
         statuses = (res.get("response") or {}).get("data", {}).get("statuses", []) if isinstance(res, dict) else []
         ok = isinstance(res, dict) and res.get("status") == "ok" and not any("error" in s for s in statuses)
         if ok:
             self.state["trades"] += 1
             log.info("[LIVE] %s %s %s -> %s", "KAUF" if sz > 0 else "VERKAUF", coin, abs(sz), statuses)
         else:
+            self.last_error = json.dumps(statuses or res, default=str)[:300]
             log.error("[LIVE] Order fehlgeschlagen %s %s: %s", coin, sz, res)
         return ok
 
