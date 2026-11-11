@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import json
 import logging
 import threading
 import time
@@ -58,10 +59,15 @@ class CopyBot:
     # ------------------------------------------------------------------ Trader-Auswahl
     def refresh_leaders(self, force: bool = False):
         now = time.time()
-        due = now - self.state["last_select"] > self.cfg["reselect_interval_hours"] * 3600
-        if not (force or due or not self.leaders):
-            return
         sel = self.ecfg["selection"]
+        rules = json.dumps(sel, sort_keys=True, default=str)
+        changed = self.state.get("selection_rules") not in (None, rules)  # Auswahl-Regeln geändert -> sofort neu
+        due = now - self.state["last_select"] > self.cfg["reselect_interval_hours"] * 3600
+        if not (force or due or changed or not self.leaders):
+            return
+        if changed:
+            log.info("Auswahl-Regeln wurden geändert – wähle Trader neu aus")
+        self.state["selection_rules"] = rules
         benched = {a for a, until in self.state["benched"].items() if until > now}
         rows = self.data.leaderboard()
         picked = [{"address": a.lower(), "name": "fest eingestellt", "score": 0.0, "pinned": True}
