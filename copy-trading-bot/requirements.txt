@@ -1,5 +1,10 @@
 requests>=2.31
 pyyaml>=6.0
-# nur für LIVE-Trading nötig:
+websocket-client>=1.7
+anthropic>=2.6   # KI-Agenten & Wochen-Analyse
+cryptography>=42 # verschlüsseltes Dashboard
+# für LIVE-Trading:
 hyperliquid-python-sdk>=0.9
 eth-account>=0.10
+# für LIVE-Memecoin-Trading (Solana):
+solders>=0.21

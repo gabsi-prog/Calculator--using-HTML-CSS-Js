@@ -1,0 +1,141 @@
+# ============================================================
+#  Copy-Trading-Bot – Einstellungen
+#  Diese Datei enthält KEINE Passwörter/Keys – die kommen in
+#  GitHub-Secrets bzw. in die Datei .env
+# ============================================================
+
+# "paper" = Simulation mit echten Kursen, KEIN echtes Geld (Standard!)
+# "live"  = echte Orders auf Hyperliquid
+# (kann per Umgebungsvariable COPYBOT_MODE überschrieben werden)
+mode: paper
+
+# Startkapital für den Paper-Modus (USD)
+paper_start_balance: 1000
+
+# Dauerbetrieb: wie oft spätestens nachgeschaut wird (Sekunden)
+poll_interval_sec: 30
+# Dauerbetrieb: sofort reagieren, wenn ein Trader handelt (WebSocket)
+use_websocket: true
+
+# Wie oft die Liste der "besten Trader" neu berechnet wird (Stunden)
+reselect_interval_hours: 24
+
+# ---------- Auswahl der Trader ----------
+selection:
+  top_n: 5                    # wie vielen Tradern gefolgt wird
+  min_account_value: 100000   # nur Konten ab 100k USD (eigenes Geld im Spiel)
+  max_account_value: 50000000 # sehr große Fonds/Market-Maker ausschließen
+  min_month_roi: 0.05         # mind. +5 % im letzten Monat
+  max_month_roi: 5.0          # >500 %/Monat = meist Glück/Zocker -> raus
+  min_alltime_pnl: 100000     # langfristig profitabel
+  require_positive_week: true # auch die letzte Woche im Plus
+  min_month_volume: 1000000   # aktiv handelnde Trader
+  # Scalper-Filter: Trader, die zu kurz halten, kann man nicht sinnvoll kopieren
+  min_median_hold_minutes: 60 # mittlere Haltedauer mind. 60 Minuten
+  max_fills_per_day: 150      # mehr Ausführungen pro Tag = Scalper/Bot
+  # Trader automatisch aussortieren, wenn DU mit ihnen Geld verlierst:
+  drop_trader_loss_pct: 0.15  # -15 % des ihm zugeteilten Kapitals -> raus
+  bench_days: 14              # ... und für 14 Tage gesperrt
+  pinned_traders: []          # Adressen, die IMMER kopiert werden
+  excluded_traders: []        # Adressen, die NIE kopiert werden
+
+# ---------- Kopier-Logik ----------
+copy:
+  capital_usage: 0.8          # Anteil des Kapitals im Einsatz (Rest = Puffer)
+  copy_ratio: 0.5             # 0.5 = halb so viel Hebel wie die Trader
+  min_trade_usd: 12           # Hyperliquid-Minimum ist 10 USD
+  rebalance_threshold: 0.10   # erst ab 10 % Abweichung nachziehen (spart Gebühren)
+  slippage: 0.01              # max. Slippage für Market-Orders
+
+# ---------- Risiko-Management ----------
+risk:
+  max_leverage: 3.0           # Gesamtexposure / Kontowert
+  max_position_pct: 0.35      # max. Anteil des Kontos pro Coin
+  stop_loss_pct: 0.08         # Stop-Loss 8 % vom Einstiegspreis – liegt AN DER BÖRSE
+  stop_cooldown_hours: 12     # nach Stop-Loss diesen Coin 12 h nicht wieder kaufen
+  max_drawdown_pct: 0.25      # Kill-Switch: ab -25 % vom Höchststand alles schließen & stoppen
+  allowed_coins: []           # leer = alle, sonst z.B. [BTC, ETH, SOL]
+  blocked_coins: []           # z.B. [kPEPE, kBONK]
+  close_on_leader_exit: true  # Position schließen, wenn der Trader schließt
+
+# ---------- Telegram ----------
+telegram:
+  notify_trades: true
+  daily_report_hour_utc: 18   # 18 UTC = 19 Uhr (Winter) / 20 Uhr (Sommer) deutsche Zeit
+
+# ---------- Selbst-Lernen ----------
+# Der Bot passt sich täglich selbst an. Er darf dabei VORSICHTIGER werden, aber nie riskanter
+# als die Werte oben (Ausnahme: Stop-Loss-Abstand lernt zwischen 4 % und 15 %).
+learning:
+  enabled: true
+  risk_throttle: true         # bei Verlusten automatisch kleinere Positionen (jede Sekunde)
+  weight_learning_rate: 2.0   # wie schnell gute Trader mehr Kapital bekommen
+  min_samples: 3              # erst ab so vielen Beispielen etwas ändern
+
+# ---------- Wöchentliche KI-Analyse (Claude) ----------
+# Braucht ANTHROPIC_API_KEY (console.anthropic.com). Kosten: wenige Cent pro Woche.
+ai_review:
+  auto_apply: true            # Vorschläge automatisch übernehmen (immer innerhalb der Grenzen)
+
+# ---------- Memecoin-Bot (Solana) ----------
+# Kopiert die Käufe/Verkäufe von Solana-Wallets, die du z. B. in FOMO oder Axiom gefunden hast.
+# Handelt direkt on-chain über Jupiter. Läuft NUR im Dauerbetrieb (Server/PC) – für Memecoins
+# zählen Sekunden, GitHub Actions (alle 5 min) ist dafür zu langsam.
+# ACHTUNG: Memecoins sind extrem riskant. Die meisten fallen auf null. Nur Spielgeld einsetzen!
+meme:
+  enabled: false              # einschalten, sobald du Wallets eingetragen hast
+  paper_start_sol: 2.0        # Spielgeld im Paper-Modus (SOL)
+  wallets: []                 # Wallet-Adressen der Trader, z. B. aus FOMO-Profilen oder dem Axiom-Wallet-Tracker
+  #  - "AdresseVonTrader1..."
+  poll_sec: 3                 # wie oft die Wallets geprüft werden
+  rpc_url: "https://api.mainnet-beta.solana.com"   # besser: eigene Helius-URL (kostenlos, schneller)
+  # --- Einsatz ---
+  sol_per_trade: 0.05         # Einsatz pro Kauf
+  min_leader_buy_sol: 0.2     # nur kopieren, wenn der Trader mind. so viel kauft (Spielereien ignorieren)
+  max_open_positions: 8
+  max_buys_per_day: 25
+  daily_loss_limit_sol: 0.5   # ab diesem Tagesverlust keine neuen Käufe bis morgen
+  # --- Ausstieg ---
+  stop_loss_pct: 0.35         # -35 % -> alles verkaufen
+  take_profit_pct: 1.0        # +100 % -> Hälfte verkaufen (Einsatz gesichert)
+  trailing_stop_pct: 0.30     # danach: 30 % unter dem Höchststand -> Rest verkaufen
+  max_hold_hours: 24          # spätestens nach 24 h raus
+  follow_leader_sells: true   # verkauft der Trader, verkaufst du anteilig mit
+  # --- Sicherheits-Checks vor jedem Kauf ---
+  max_signal_age_sec: 45      # Kauf des Traders ist älter -> zu spät, nicht hinterherlaufen
+  max_chase_pct: 0.25         # Kurs seit dem Kauf des Traders schon >25 % gestiegen -> nicht kaufen
+  min_liquidity_usd: 15000
+  max_price_impact_pct: 0.05
+  require_mint_revoked: true  # Entwickler darf keine neuen Tokens drucken
+  require_freeze_revoked: true # Entwickler darf deine Tokens nicht einfrieren
+  block_rugcheck_danger: true # RugCheck meldet "danger" -> nicht kaufen
+  slippage_bps: 300           # 3 % max. Slippage
+  # --- Trader aussortieren ---
+  drop_leader_loss_sol: 0.25  # Wallet hat dir so viel SOL verloren -> 14 Tage Pause
+  bench_days: 14
+  jupiter_api: "https://lite-api.jup.ag"
+
+# ---------- KI-Agenten-Team (Claude) ----------
+# Markt-Analyst, Nachrichten-Analyst (Websuche), Trader-Analyst und Risiko-Chef.
+# Der Risiko-Chef kann den Bot nur BREMSEN (kleinere Positionen, Coins sperren), nie verstärken.
+# Braucht ANTHROPIC_API_KEY. Kosten pro Analyse-Runde ca. 0,20–0,40 USD.
+agents:
+  enabled: true
+  interval_hours: 8           # alle 8 h (3x täglich) -> ca. 20–35 USD/Monat
+  monthly_budget_usd: 30      # harte Obergrenze; danach pausiert das Team bis Monatsende
+  model: claude-opus-5-5
+
+# ---------- Web-Dashboard ----------
+# Dauerbetrieb: http://localhost:8080 (Server: http://DEINE_IP:8080)
+# GitHub: https://<dein-name>.github.io/<repo>/bot/
+# Mit DASHBOARD_PASSWORD (Secret/.env) werden die Daten verschlüsselt.
+dashboard:
+  enabled: true
+  port: 8080
+
+# ---------- Backtest ----------
+backtest:
+  delay_penalty: 0.001        # 0,1 % schlechterer Preis je Trade (Verzögerung beim Kopieren)
+
+state_file: "state-{mode}.json"
+log_file: bot.log

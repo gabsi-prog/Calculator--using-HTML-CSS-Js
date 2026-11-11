@@ -1,0 +1,130 @@
+# Copy-Trading-Bot – läuft automatisch alle 5 Minuten auf GitHub (kein eigener Server nötig)
+# Einstellungen: copy-trading-bot/config.yaml | Schlüssel: Settings -> Secrets and variables -> Actions
+name: Copy-Trading-Bot
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"   # alle 5 Minuten (GitHub startet oft etwas später)
+    - cron: "23 7 * * 0"    # sonntags ~8 Uhr: wöchentliche KI-Analyse
+    - cron: "53 */8 * * *"  # alle 8 Stunden: KI-Agenten-Team
+  workflow_dispatch:         # manuell starten: Tab "Actions" -> "Copy-Trading-Bot" -> "Run workflow"
+    inputs:
+      aktion:
+        description: "Was soll der Bot tun?"
+        type: choice
+        default: durchlauf
+        options:
+          - durchlauf
+          - trader-anzeigen
+          - backtest
+          - bericht
+          - telegram-test
+          - kill-switch-zuruecksetzen
+          - ki-analyse
+          - lernstand
+          - gelerntes-zuruecksetzen
+          - agenten
+          - dashboard-aktualisieren
+
+permissions:
+  contents: read
+  pages: write      # Dashboard als Website veröffentlichen
+  id-token: write
+
+concurrency:
+  group: copybot
+  cancel-in-progress: false
+
+jobs:
+  bot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      deploy: ${{ steps.dash.outputs.deploy }}
+    defaults:
+      run:
+        working-directory: copy-trading-bot
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: copy-trading-bot/requirements.txt
+
+      - name: Abhängigkeiten installieren
+        run: pip install -r requirements.txt
+
+      - name: Bot-Gedächtnis laden (Kontostand, Positionen, Trader)
+        uses: actions/cache/restore@v4
+        with:
+          path: copy-trading-bot/state-*.json
+          key: copybot-state-${{ github.run_id }}
+          restore-keys: copybot-state-
+
+      - name: Bot ausführen
+        env:
+          COPYBOT_MODE: ${{ vars.COPYBOT_MODE || 'paper' }}
+          HL_PRIVATE_KEY: ${{ secrets.HL_PRIVATE_KEY }}
+          HL_ACCOUNT_ADDRESS: ${{ secrets.HL_ACCOUNT_ADDRESS }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          DASHBOARD_PASSWORD: ${{ secrets.DASHBOARD_PASSWORD }}
+          AKTION: ${{ inputs.aktion || (github.event.schedule == '23 7 * * 0' && 'ki-analyse') || (github.event.schedule == '53 */8 * * *' && 'agenten') || 'durchlauf' }}
+        run: |
+          case "$AKTION" in
+            durchlauf)                 python -m copybot --once ;;
+            trader-anzeigen)           python -m copybot --leaders ;;
+            backtest)                  python -m copybot --backtest ;;
+            bericht)                   python -m copybot --report ;;
+            telegram-test)             python -m copybot --telegram-test ;;
+            kill-switch-zuruecksetzen) python -m copybot --reset-halt ;;
+            ki-analyse)                python -m copybot --ki-analyse ;;
+            lernstand)                 python -m copybot --lernstand ;;
+            gelerntes-zuruecksetzen)   python -m copybot --reset-lernen ;;
+            agenten)                   python -m copybot --agenten ;;
+            dashboard-aktualisieren)   echo "Dashboard wird neu gebaut" ;;
+          esac
+
+      - name: Dashboard bauen (alle ~15 min)
+        id: dash
+        if: always()
+        continue-on-error: true
+        env:
+          COPYBOT_MODE: ${{ vars.COPYBOT_MODE || 'paper' }}
+          DASHBOARD_PASSWORD: ${{ secrets.DASHBOARD_PASSWORD }}
+          GITHUB_EVENT_SCHEDULE: ${{ github.event.schedule }}
+        run: |
+          M=$(date -u +%-M)
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] || [ $((M % 15)) -lt 5 ] || [ "$GITHUB_EVENT_SCHEDULE" = "53 */8 * * *" ]; then
+            mkdir -p ../_site
+            cp ../index.html ../script.js ../style.css ../utils.css ../_site/ 2>/dev/null || true   # Taschenrechner bleibt erhalten
+            python -m copybot --export-dashboard ../_site/bot
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Dashboard hochladen
+        if: always() && steps.dash.outputs.deploy == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Bot-Gedächtnis speichern
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: copy-trading-bot/state-*.json
+          key: copybot-state-${{ github.run_id }}
+
+  # Veröffentlicht das Dashboard auf GitHub Pages: https://<name>.github.io/<repo>/bot/
+  dashboard:
+    needs: bot
+    if: always() && needs.bot.outputs.deploy == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}bot/
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

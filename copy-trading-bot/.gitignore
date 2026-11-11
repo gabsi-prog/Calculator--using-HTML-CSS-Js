@@ -1,6 +1,5 @@
-config.yaml
 .env
-state.json
+state*.json
 *.log
 __pycache__/
 .venv/

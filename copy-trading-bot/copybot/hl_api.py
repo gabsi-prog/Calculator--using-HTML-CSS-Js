@@ -69,3 +69,33 @@ class HyperliquidData:
             "accountValue": float(st["marginSummary"]["accountValue"]),
             "positions": positions,
         }
+
+    def user_fills(self, address: str) -> list[dict]:
+        """Letzte (bis zu 2000) Ausführungen eines Traders, nur Perps."""
+        fills = self._post({"type": "userFills", "user": address}) or []
+        return [f for f in fills if not f["coin"].startswith("@") and "/" not in f["coin"]]
+
+    def market_contexts(self) -> dict[str, dict]:
+        """coin -> {funding, openInterest, markPx, prevDayPx, dayNtlVlm, premium}"""
+        meta, ctxs = self._post({"type": "metaAndAssetCtxs"})
+        out = {}
+        for a, c in zip(meta["universe"], ctxs):
+            if a.get("isDelisted"):
+                continue
+            out[a["name"]] = {k: float(c[k]) for k in ("funding", "openInterest", "markPx", "prevDayPx", "dayNtlVlm")
+                              if c.get(k) is not None}
+            if c.get("premium") is not None:
+                out[a["name"]]["premium"] = float(c["premium"])
+        return out
+
+    def candles(self, coin: str, interval: str = "4h", days: int = 14) -> list[dict]:
+        end = int(time.time() * 1000)
+        req = {"coin": coin, "interval": interval, "startTime": end - days * 86_400_000, "endTime": end}
+        rows = self._post({"type": "candleSnapshot", "req": req}) or []
+        return [{"t": r["t"], "o": float(r["o"]), "h": float(r["h"]), "l": float(r["l"]), "c": float(r["c"]),
+                 "v": float(r["v"])} for r in rows]
+
+
+def round_px(px: float, sz_decimals: int) -> float:
+    """Hyperliquid-Preisregeln für Perps: max. 5 signifikante Stellen, max. (6 - szDecimals) Nachkommastellen."""
+    return round(float(f"{px:.5g}"), max(0, 6 - sz_decimals))
