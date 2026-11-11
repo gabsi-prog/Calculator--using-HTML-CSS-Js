@@ -127,7 +127,7 @@ agents:
 
 # ---------- Web-Dashboard ----------
 # Dauerbetrieb: http://localhost:8080 (Server: http://DEINE_IP:8080)
-# GitHub: https://<dein-name>.github.io/<repo>/bot/
+# GitHub: https://<dein-name>.github.io/<repo>/
 # Mit DASHBOARD_PASSWORD (Secret/.env) werden die Daten verschlüsselt.
 dashboard:
   enabled: true

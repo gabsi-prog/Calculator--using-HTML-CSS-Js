@@ -77,12 +77,10 @@ Der Bot veröffentlicht alle ~15 Minuten eine Website mit Kontostand, Kurve, KI-
 
 1. Ein Passwort ausdenken. Das Dashboard liegt öffentlich im Netz, die Daten sind aber damit verschlüsselt.
 2. Bei GitHub ein neues Secret anlegen: Name `DASHBOARD_PASSWORD`, Wert dein Passwort.
-3. **Settings → Pages**: Bei *Source* muss **„GitHub Actions“** stehen. Das ist schon so, weil dein Taschenrechner darüber läuft.
+3. **Settings → Pages** öffnen und bei *Source* **„GitHub Actions“** auswählen.
 4. In **Actions** die Aktion **`dashboard-aktualisieren`** ausführen.
-5. Öffnen: **`https://gabsi-prog.github.io/Calculator--using-HTML-CSS-Js/bot/`**, Passwort eingeben, fertig.
+5. Öffnen: **`https://gabsi-prog.github.io/Calculator--using-HTML-CSS-Js/`**, Passwort eingeben, fertig.
    Tipp fürs Handy: im Browser „Zum Startbildschirm hinzufügen“, dann sieht es aus wie eine App.
-
-Dein Taschenrechner bleibt unter der normalen Adresse erreichbar.
 
 ### Schritt 7: KI-Agenten-Team
 

@@ -61,7 +61,7 @@ Ein Monatsbudget (`agents.monthly_budget_usd`) begrenzt die Kosten hart. Code: `
 
 Eine Weboberfläche (HTML/CSS/JS, ohne Build-Schritt) in `dashboard/`. Sie zeigt Kontowert mit Verlaufskurve, Drawdown bis zum Kill-Switch, KI-Team mit Markt-Ampel, Positionen, Trader mit gelernten Gewichten, Lernstand und eine filterbare Aktivitäts-Chronik.
 - **Server/PC:** startet automatisch mit dem Bot unter `http://localhost:8080`
-- **GitHub:** wird alle ~15 min auf GitHub Pages unter `/bot/` veröffentlicht
+- **GitHub:** wird alle ~15 min auf GitHub Pages veröffentlicht
 - **Verschlüsselt:** Mit `DASHBOARD_PASSWORD` wird `data.json` mit AES-256-GCM verschlüsselt und erst im Browser entschlüsselt
 - Ohne Daten zeigt es markierte Demo-Daten
 

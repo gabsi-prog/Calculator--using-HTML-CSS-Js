@@ -1,34 +1,15 @@
-# Calculator Web App
+# Copy-Trading-Bot
 
-A simple and responsive calculator built using *HTML, **CSS, and **JavaScript*. This project helps strengthen core web development skills by implementing a functional and visually clean calculator UI.
+Automatischer Copy-Trading-Bot mit KI-Agenten-Team und Web-Dashboard „Copy-Desk“:
 
-## Features
+- **Hyperliquid:** kopiert die Positionen ausgewählter Top-Trader (Perpetual Futures)
+- **Memecoins (Solana):** kopiert Wallets, die du in FOMO oder Axiom gefunden hast, und handelt über Jupiter
+- **KI-Team:** Markt-, Nachrichten- und Trader-Analyst plus Risiko-Chef (Claude) bremsen bei Gefahr
+- **Selbstlernend**, mit Stop-Loss an der Börse, Kill-Switch, Telegram-Benachrichtigungen und Dashboard
 
-- Basic arithmetic operations: addition, subtraction, multiplication, division
-- Responsive design: works on desktop and mobile browsers
-- Clear and intuitive user interface
-- click support 
+Standard ist der **Paper-Modus** mit echten Kursen und Spielgeld.
 
-2. Open index.html in your browser.
+👉 **Einrichtung Schritt für Schritt:** [copy-trading-bot/ANLEITUNG.md](copy-trading-bot/ANLEITUNG.md)
+👉 **Technische Details:** [copy-trading-bot/README.md](copy-trading-bot/README.md)
 
-## Folder Structure
-
-| File/Folder      | Description                              |
-|------------------|------------------------------------------|
-| index.html       | Main HTML file for calculator UI         |
-| style.css        | CSS styles for layout and responsiveness |
-| utils.css        | CSS utilities for usage                  |
-| script.js        | JavaScript logic for calculations        |
-| README.md        | Project details and instructions         |
-
-## How It Works
-
-- The HTML file contains the layout and buttons for user input.
-- The CSS file provides responsive styling and layout.
-- The JavaScript file manages the display, operations, and event handling.
-
-
-
-## Contributing
-
-Open to suggestions, feature requests, and pull requests! Fork the project and make improvements.
+> Trading mit Hebel und Memecoins ist sehr riskant. Das hier ist Software, keine Anlageberatung.
