@@ -175,3 +175,12 @@ def test_report(bot):
 def test_round_px():
     assert round_px(97123.456, 5) == 97123.0
     assert round_px(0.000123456, 0) == 0.000123
+
+
+def test_reselects_when_rules_change(bot):
+    b, data = bot
+    b.refresh_leaders()
+    assert {t["address"] for t in b.leaders} == {"0xa", "0xb"}
+    b.cfg["selection"]["max_month_roi"] = 0.2          # 0xa (30 %) fällt jetzt raus
+    b.refresh_leaders()                                 # ohne force, innerhalb von 24 h
+    assert [t["address"] for t in b.leaders] == ["0xb"]

@@ -99,9 +99,7 @@ jobs:
         run: |
           M=$(date -u +%-M)
           if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] || [ $((M % 15)) -lt 5 ] || [ "$GITHUB_EVENT_SCHEDULE" = "53 */8 * * *" ]; then
-            mkdir -p ../_site
-            cp ../index.html ../script.js ../style.css ../utils.css ../_site/ 2>/dev/null || true   # Taschenrechner bleibt erhalten
-            python -m copybot --export-dashboard ../_site/bot
+            python -m copybot --export-dashboard ../_site
             echo "deploy=true" >> "$GITHUB_OUTPUT"
           fi
       - name: Dashboard hochladen
@@ -117,14 +115,14 @@ jobs:
           path: copy-trading-bot/state-*.json
           key: copybot-state-${{ github.run_id }}
 
-  # Veröffentlicht das Dashboard auf GitHub Pages: https://<name>.github.io/<repo>/bot/
+  # Veröffentlicht das Dashboard auf GitHub Pages: https://<name>.github.io/<repo>/
   dashboard:
     needs: bot
     if: always() && needs.bot.outputs.deploy == 'true'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}bot/
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
