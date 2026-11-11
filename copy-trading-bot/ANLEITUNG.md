@@ -79,7 +79,7 @@ Der Bot veröffentlicht alle ~15 Minuten eine Website mit Kontostand, Kurve, KI-
 2. Bei GitHub ein neues Secret anlegen: Name `DASHBOARD_PASSWORD`, Wert dein Passwort.
 3. **Settings → Pages** öffnen und bei *Source* **„GitHub Actions“** auswählen.
 4. In **Actions** die Aktion **`dashboard-aktualisieren`** ausführen.
-5. Öffnen: **`https://gabsi-prog.github.io/Calculator--using-HTML-CSS-Js/`**, Passwort eingeben, fertig.
+5. Öffnen: **`https://gabsi-prog.github.io/copy-trading-bot/`**, Passwort eingeben, fertig.
    Tipp fürs Handy: im Browser „Zum Startbildschirm hinzufügen“, dann sieht es aus wie eine App.
 
 ### Schritt 7: KI-Agenten-Team
@@ -161,8 +161,8 @@ Ab dem nächsten Lauf handelt der Bot mit echtem Geld. **Gib niemals den Private
    ```
 4. Auf dem Server nacheinander eingeben:
    ```
-   git clone https://github.com/gabsi-prog/Calculator--using-HTML-CSS-Js.git
-   cd Calculator--using-HTML-CSS-Js/copy-trading-bot
+   git clone https://github.com/gabsi-prog/copy-trading-bot.git
+   cd copy-trading-bot/copy-trading-bot
    bash deploy/install.sh
    nano .env
    ```
@@ -186,7 +186,7 @@ Nützliche Befehle auf dem Server:
 | `journalctl -u copybot -f` | Live-Log ansehen (Beenden: `Strg+C`) |
 | `sudo systemctl restart copybot` | Neu starten, z. B. nach Änderung der Einstellungen |
 | `sudo systemctl stop copybot` | Bot stoppen |
-| `cd ~/Calculator--using-HTML-CSS-Js && git pull && sudo systemctl restart copybot` | Updates holen |
+| `cd ~/copy-trading-bot && git pull && sudo systemctl restart copybot` | Updates holen |
 
 ---
 
